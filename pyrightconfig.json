@@ -1,0 +1,12 @@
+{
+    "venvPath": "antordrishti",
+    "venv": ".venv",
+    "extraPaths": [
+        "antordrishti"
+    ],
+    "pythonVersion": "3.9",
+    "typeCheckingMode": "basic",
+    "reportOptionalMemberAccess": "none",
+    "reportIncompatibleMethodOverride": "none",
+    "reportMissingImports": "none"
+}

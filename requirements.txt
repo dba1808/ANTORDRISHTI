@@ -1,0 +1,40 @@
+# ============================================================
+# Antordrishti — Questioned Document Forensic Analysis Framework
+# Comprehensive Project Requirements
+# ============================================================
+
+# ── Core GUI & Qt Framework ─────────────────────────────────
+PyQt5>=5.15.10
+PyQt5-Qt5>=5.15.2
+PyQt5-sip>=12.13.0
+PyQt5-stubs>=5.15.6.0
+QtAwesome>=1.3.1
+QtPy>=2.4.1
+
+# ── Document & Image Processing ──────────────────────────────
+PyMuPDF>=1.23.0           # PDF loading, rendering, and page extraction (fitz)
+Pillow>=10.2.0            # Image manipulation and format conversions
+opencv-python>=4.8.0      # Computer vision, filtering, ELA, and edge detection
+numpy>=1.24.0             # Array operations, image matrices
+scipy>=1.11.0             # Signal processing, Fourier transforms, noise analysis
+scikit-image>=0.22.0      # Image forensics, SSIM, texture analysis
+
+# ── Forensic Metadata & Extraction ───────────────────────────
+piexif>=1.1.3             # EXIF metadata reading and writing
+ExifRead>=3.0.0           # Camera EXIF parser
+imagehash>=4.3.1          # Perceptual hashing (aHash, pHash, dHash, wHash)
+pytesseract>=0.3.10       # OCR optical character recognition backend
+
+# ── Visualization, Data & Reporting ──────────────────────────
+matplotlib>=3.8.0         # Forensic plots, histograms, illumination graphs
+pandas>=2.1.0             # Tabular data handling for metadata & batch processing
+reportlab>=4.0.0          # Forensic PDF report generation engine
+pydantic>=2.5.0           # Data model validation and serialization
+
+# ── Deep Learning & Machine Learning (Forensic Engines) ──────
+torch>=2.1.0              # Deep learning framework for neural forgery models
+torchvision>=0.16.0       # Vision models and preprocessing transforms
+
+# ── Typing & Development Tools ───────────────────────────────
+typing_extensions>=4.8.0
+mypy>=1.8.0

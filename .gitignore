@@ -1,0 +1,99 @@
+# ==========================================
+# Python & Bytecode
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+*/.venv/
+*/venv/
+
+# ==========================================
+# Type Checkers, Linters & Test Caches
+# ==========================================
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.pyre/
+pyrefly.out
+
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# ==========================================
+# Machine Learning Models & Heavy Datasets
+# ==========================================
+*.pth
+*.pt
+*.ckpt
+*.bin
+*.onnx
+*.h5
+*.hdf5
+*.pb
+*.tflite
+*.safetensors
+*.engine
+*.weights
+*.pkl
+*.pickle
+
+# ==========================================
+# Logs & Temporary Files
+# ==========================================
+logs/
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+
+# ==========================================
+# IDE & System Files
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

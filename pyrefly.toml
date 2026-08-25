@@ -1,0 +1,12 @@
+search-path = ["antordrishti"]
+python-version = "3.9"
+ignore-missing-imports = [
+    "PyQt5",
+    "PyQt5.*"
+]
+
+[errors]
+missing-attribute = "ignore"
+bad-override = "ignore"
+missing-import = "ignore"
+missing-module = "ignore"
