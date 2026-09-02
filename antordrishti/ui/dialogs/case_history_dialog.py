@@ -175,6 +175,19 @@ class CaseHistoryDialog(QDialog):
         case_data = get_db().get_case(case_id)
         if case_data:
             self._selected_case = CaseModel.from_dict(case_data)
+            
+            try:
+                db = get_db()
+                db._conn.execute(
+                    """INSERT INTO case_events
+                       (case_id, evidence_id, event_type, description, timestamp)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (self._selected_case.case_id, "", "Case Opened", f"Opened case: {self._selected_case.title}", __import__('datetime').datetime.now().isoformat())
+                )
+                db._conn.commit()
+            except Exception:
+                pass
+                
             self.case_selected.emit(self._selected_case)
             self.accept()
 

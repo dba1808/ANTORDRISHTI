@@ -4,9 +4,9 @@ Antordrishti — Settings Page
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTabWidget,
-    QComboBox, QSpinBox, QCheckBox, QFrame, QLineEdit
+    QComboBox, QSpinBox, QCheckBox, QFrame, QLineEdit, QFileDialog
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 
 from app.theme import Colors, Spacing
 from ui.widgets.common import SectionLabel, ActionButton, Separator, InfoRow
@@ -115,10 +115,26 @@ class SettingsPage(QWidget):
         ]), "Document Viewer")
 
         # Analysis
+        self._settings = QSettings("Antordrishti", "Antordrishti")
+        self._tesseract_path = QLineEdit(
+            str(self._settings.value("ocr/tesseract_path", ""))
+        )
+        browse_tess = ActionButton("Browse...")
+        browse_tess.clicked.connect(self._browse_tesseract)
+        tess_row = QWidget()
+        tess_layout = QHBoxLayout(tess_row)
+        tess_layout.setContentsMargins(0, 0, 0, 0)
+        tess_layout.setSpacing(6)
+        tess_layout.addWidget(self._tesseract_path, 1)
+        tess_layout.addWidget(browse_tess)
+        self._tesseract_path.editingFinished.connect(self._save_tesseract_path)
+
         tabs.addTab(_make_settings_tab("Analysis", [
             ("Default ELA Quality", QSpinBox()),
             ("Default Analysis Profile", QComboBox()),
             ("Auto-hash on Import", QCheckBox("Enabled")),
+            None,
+            ("Tesseract Executable", tess_row),
         ]), "Analysis")
 
         # Evidence
@@ -153,3 +169,17 @@ class SettingsPage(QWidget):
         ]), "Performance")
 
         layout.addWidget(tabs, 1)
+
+    def _browse_tesseract(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Tesseract Executable",
+            "",
+            "Executable (*.exe);;All Files (*.*)",
+        )
+        if path:
+            self._tesseract_path.setText(path)
+            self._save_tesseract_path()
+
+    def _save_tesseract_path(self):
+        self._settings.setValue("ocr/tesseract_path", self._tesseract_path.text().strip())

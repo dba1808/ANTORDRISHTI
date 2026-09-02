@@ -153,6 +153,14 @@ class NewCaseDialog(QDialog):
                     "Please use a different Case ID."
                 )
                 return
+                
+            db._conn.execute(
+                """INSERT INTO case_events
+                   (case_id, evidence_id, event_type, description, timestamp)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (self._case.case_id, "", "Case Created", f"Manually created case: {self._case.title}", __import__('datetime').datetime.now().isoformat())
+            )
+            db._conn.commit()
         except Exception as e:
             QMessageBox.warning(
                 self, "Database Error",

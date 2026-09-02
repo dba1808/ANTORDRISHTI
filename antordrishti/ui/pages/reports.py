@@ -17,6 +17,8 @@ class ReportsPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._current_context = None
+        self._ocr_result = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -38,61 +40,47 @@ class ReportsPage(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left: Report preview
-        preview = QFrame()
-        preview.setStyleSheet(f"""
+        self.preview = QFrame()
+        self.preview.setStyleSheet(f"""
             QFrame {{
                 background-color: {Colors.CANVAS};
-                border: 1px solid {Colors.BORDER};
+                border: 2px solid #2B2B2B;
+                border-radius: 4px;
             }}
         """)
-        p_layout = QVBoxLayout(preview)
+        p_layout = QVBoxLayout(self.preview)
         p_layout.setContentsMargins(Spacing.XXL, Spacing.XXL,
                                     Spacing.XXL, Spacing.XXL)
         p_layout.setSpacing(Spacing.MD)
 
         # Report header
         rpt_title = QLabel("অন্তর্দৃষ্টি | ANTORDRISHTI")
-        rpt_title.setStyleSheet(
-            f"font-size: 20px; font-weight: 700; color: {Colors.ACCENT};"
-        )
+        rpt_title.setStyleSheet("font-size: 20px; font-weight: 700; color: #B08D3A; border: none;")
         rpt_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p_layout.addWidget(rpt_title)
 
         rpt_sub = QLabel("Document Forensic & Authenticity Analysis Report")
-        rpt_sub.setStyleSheet(
-            f"font-size: 13px; color: {Colors.TEXT_SECONDARY};"
-        )
+        rpt_sub.setStyleSheet("font-size: 13px; color: #2B2B2B; border: none;")
         rpt_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p_layout.addWidget(rpt_sub)
 
         p_layout.addWidget(Separator())
 
-        sections = [
-            "Case Information", "Examiner Information",
-            "Evidence Information", "Document Information",
-            "Integrity Verification", "Methods Applied",
-            "Analysis Results", "Forensic Findings",
-            "Suspicious Regions", "Examiner Notes",
-            "Conclusion", "Audit Trail",
-        ]
-        for sec in sections:
-            sec_label = QLabel(sec)
-            sec_label.setStyleSheet(
-                f"font-size: 13px; font-weight: 600; color: {Colors.TEXT_PRIMARY};"
-                f" padding-top: 8px;"
-            )
-            p_layout.addWidget(sec_label)
+        self.preview_text = QTextEdit()
+        self.preview_text.setReadOnly(True)
+        self.preview_text.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #B08D3A;
+                background-color: #FFFFFF;
+                color: #2B2B2B;
+                font-family: monospace;
+                padding: 10px;
+            }
+        """)
+        self.preview_text.setPlaceholderText("No data available. Click Generate Report to preview.")
+        p_layout.addWidget(self.preview_text, 1)
 
-            content = QLabel("No data available. Load a case and run analysis.")
-            content.setStyleSheet(
-                f"font-size: 11px; color: {Colors.TEXT_TERTIARY};"
-                f" padding-left: 12px;"
-            )
-            content.setWordWrap(True)
-            p_layout.addWidget(content)
-
-        p_layout.addStretch()
-        splitter.addWidget(preview)
+        splitter.addWidget(self.preview)
 
         # Right: Controls
         right = QFrame()
@@ -100,7 +88,7 @@ class ReportsPage(QWidget):
         right.setStyleSheet(f"""
             QFrame {{
                 background-color: {Colors.PANEL};
-                border: 1px solid {Colors.BORDER};
+                border: 2px solid #2B2B2B;
                 border-radius: 4px;
             }}
         """)
@@ -122,12 +110,15 @@ class ReportsPage(QWidget):
 
         btn_pdf = ActionButton("Export PDF")
         btn_pdf.clicked.connect(lambda: self._on_export("PDF Document (*.pdf)"))
+        btn_text = ActionButton("Export Text")
+        btn_text.clicked.connect(lambda: self._on_export("Text Document (*.txt)"))
         btn_html = ActionButton("Export HTML")
         btn_html.clicked.connect(lambda: self._on_export("HTML Document (*.html)"))
         btn_print = ActionButton("Print")
         btn_print.clicked.connect(self._on_print)
 
         r_layout.addWidget(btn_pdf)
+        r_layout.addWidget(btn_text)
         r_layout.addWidget(btn_html)
         r_layout.addWidget(btn_print)
 
@@ -135,6 +126,14 @@ class ReportsPage(QWidget):
         r_layout.addWidget(SectionLabel("Report Sections"))
 
         from PyQt5.QtWidgets import QCheckBox
+        sections = [
+            "Case Information", "Examiner Information",
+            "Evidence Information", "Document Information",
+            "Integrity Verification", "Methods Applied",
+            "Analysis Results", "Forensic Findings",
+            "Suspicious Regions", "Examiner Notes",
+            "Conclusion", "Audit Trail",
+        ]
         for sec in sections:
             cb = QCheckBox(sec)
             cb.setChecked(True)
@@ -148,23 +147,75 @@ class ReportsPage(QWidget):
 
         layout.addWidget(splitter, 1)
 
+    def set_current_context(self, context):
+        """Receive the global current case/evidence/document context."""
+        self._current_context = context
+        if context and context.case and context.evidence:
+            try:
+                from services.db_service import get_db
+                db = get_db()
+                runs = db.get_ocr_runs_for_evidence(context.evidence.evidence_id)
+                if runs:
+                    self._ocr_result = runs[0]
+            except Exception as e:
+                import logging
+                logging.getLogger("antordrishti.reports").warning(f"Could not load OCR results for report: {e}")
+
     def _on_generate(self):
         from PyQt5.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Report Generator", "Report preview generated successfully.")
+        if not self._current_context or not self._current_context.case or not self._current_context.evidence:
+            QMessageBox.information(self, "Report Generator", "Please load a case and evidence first.")
+            return
+            
+        try:
+            from services.report_service import generate_case_report
+            import os
+            output_dir = os.path.join(os.path.expanduser("~"), "Documents", "Antordrishti_Reports")
+            path = generate_case_report(self._current_context.case, self._current_context.evidence, output_dir)
+            
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                
+            self.preview_text.setText(content)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to generate report: {e}")
 
     def _on_preview(self):
-        from PyQt5.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Report Preview", "Displaying report preview.")
+        self._on_generate()
 
     def _on_save(self):
-        from PyQt5.QtWidgets import QMessageBox
-        QMessageBox.information(self, "Save Report", "Report draft saved successfully.")
+        self._on_generate()
 
     def _on_export(self, file_filter: str):
         from PyQt5.QtWidgets import QFileDialog, QMessageBox
+        
+        if not self._current_context or not self._current_context.case or not self._current_context.evidence:
+            QMessageBox.information(self, "Export Report", "Please load a case and evidence first.")
+            return
+            
         path, _ = QFileDialog.getSaveFileName(self, "Export Forensic Report", "", file_filter)
         if path:
-            QMessageBox.information(self, "Export Report", f"Report exported successfully to:\n{path}")
+            try:
+                from services.report_service import ReportGenerator
+                import os
+                
+                output_dir = os.path.dirname(path)
+                gen = ReportGenerator(output_dir)
+                
+                if path.endswith(".pdf"):
+                    final_path = gen.generate_pdf_report(self._current_context.case, self._current_context.evidence, self._ocr_result)
+                elif path.endswith(".txt"):
+                    final_path = gen.generate_text_report(self._current_context.case, self._current_context.evidence, self._ocr_result)
+                else:
+                    final_path = gen.generate_text_report(self._current_context.case, self._current_context.evidence, self._ocr_result)
+                
+                if final_path != path:
+                    import shutil
+                    shutil.move(final_path, path)
+                    
+                QMessageBox.information(self, "Export Report", f"Report exported successfully to:\n{path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to export report: {e}")
 
     def _on_print(self):
         from PyQt5.QtWidgets import QMessageBox

@@ -81,16 +81,29 @@ def _populate_image_info(doc: DocumentModel) -> bool:
             if dpi_info:
                 doc.dpi = int(dpi_info[0])
 
-            # EXIF extraction
+            # Robust EXIF extraction
             exif_data = img.getexif()
+            tag_map = {}
             if exif_data:
-                tag_map = {ExifTags.TAGS.get(k, str(k)): v for k, v in exif_data.items()}
+                tag_map.update({ExifTags.TAGS.get(k, str(k)): v for k, v in exif_data.items()})
+                # Get EXIF IFD data (e.g., DateTimeOriginal, FNumber, ISO)
+                try:
+                    for ifd_id in [ExifTags.IFD.Exif, ExifTags.IFD.IFD0, ExifTags.IFD.IFD1]:
+                        ifd_data = exif_data.get_ifd(ifd_id)
+                        tag_map.update({ExifTags.TAGS.get(k, str(k)): v for k, v in ifd_data.items()})
+                except Exception:
+                    pass
+            
+            if tag_map:
+                # Add 'Source: EXIF' to the metadata representation if needed, or just store it.
                 doc.raw_metadata = {str(k): str(v) for k, v in tag_map.items()}
                 doc.camera_make = str(tag_map.get("Make", "Not Available"))
                 doc.camera_model = str(tag_map.get("Model", "Not Available"))
                 doc.software = str(tag_map.get("Software", "Not Available"))
-                doc.creation_date = str(tag_map.get("DateTime", tag_map.get("DateTimeOriginal", doc.last_modified)))
+                doc.creation_date = str(tag_map.get("DateTime", tag_map.get("DateTimeOriginal", tag_map.get("DateTimeDigitized", doc.last_modified))))
                 doc.author = str(tag_map.get("Artist", tag_map.get("Copyright", "Not Available")))
+            else:
+                doc.raw_metadata = {}
         return True
     except Exception as e:
         logger.warning(f"Pillow failed to read image info for '{doc.file_path}': {e}")

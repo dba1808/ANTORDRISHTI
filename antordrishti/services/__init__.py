@@ -1,6 +1,6 @@
 """
 Antordrishti — Services Package
-File, hash, document, and database services.
+File, hash, document, database, and OCR services.
 """
 
 from services.file_service import (

@@ -8,6 +8,15 @@ from models.document_model import DocumentModel
 from models.analysis_model import AnalysisModel
 from models.evidence_model import EvidenceModel
 from models.finding_model import FindingModel
+from models.ocr_models import (
+    ImageQualityReport,
+    PreprocessingStep,
+    ScriptDetectionResult,
+    LanguageCandidate,
+    LanguageIdentificationResult,
+    OCRPageResult,
+    OCRDocumentResult,
+)
 
 # Backwards-compatible aliases
 Case = CaseModel
@@ -29,4 +38,11 @@ __all__ = [
     "Evidence",
     "EvidenceItem",
     "Finding",
+    "ImageQualityReport",
+    "PreprocessingStep",
+    "ScriptDetectionResult",
+    "LanguageCandidate",
+    "LanguageIdentificationResult",
+    "OCRPageResult",
+    "OCRDocumentResult",
 ]

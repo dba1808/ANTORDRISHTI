@@ -311,6 +311,8 @@ class ForensicToolsPanel(QWidget):
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 ))
+        else:
+            self.hist_chart_label.clear()
 
     def _on_hist_channel_changed(self):
         self.apply_operation.emit("update_hist", {})
@@ -329,6 +331,7 @@ class DocumentAnalysisPage(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet("background-color: #FFFFFF;")
 
+        self._current_context = None
         self._last_hist_image: Optional[np.ndarray] = None
 
         layout = QHBoxLayout(self)
@@ -364,6 +367,17 @@ class DocumentAnalysisPage(QWidget):
         layout.addWidget(splitter, 1)
 
         self.viewer_toolbar.tool_selected.connect(self._on_toolbar_selected)
+
+    def set_current_context(self, context):
+        """Receive the global current case/evidence/document context."""
+        self._current_context = context
+
+    def clear_workspace(self):
+        """Completely clear the viewer and reset tools."""
+        self._current_context = None
+        self.document_viewer.clear()
+        self.tools_panel.update_history_list([], -1)
+        self.tools_panel.set_histogram_image(None)
 
     def _on_history_updated(self, steps: List[str], current_idx: int):
         self.tools_panel.update_history_list(steps, current_idx)
@@ -463,6 +477,38 @@ class DocumentAnalysisPage(QWidget):
                 out_qimg = ip.cv_to_qimage(res_cv)
                 if out_qimg:
                     self.document_viewer.push_processed_step(label, out_qimg)
+                    
+                    # Log event if context exists
+                    if getattr(self, "_current_context", None) and self._current_context.case and self._current_context.evidence:
+                        try:
+                            from services.db_service import get_db
+                            db = get_db()
+                            
+                            # Log processing history
+                            db.add_processing_history(
+                                self._current_context.case.case_id,
+                                self._current_context.evidence.evidence_id,
+                                label,
+                                params
+                            )
+                            
+                            # Log case event
+                            db._conn.execute(
+                                """INSERT INTO case_events
+                                   (case_id, evidence_id, event_type, description, timestamp)
+                                   VALUES (?, ?, ?, ?, ?)""",
+                                (
+                                    self._current_context.case.case_id,
+                                    self._current_context.evidence.evidence_id,
+                                    "Image Processing",
+                                    f"Applied {label} filter",
+                                    __import__('datetime').datetime.now().isoformat()
+                                )
+                            )
+                            db._conn.commit()
+                        except Exception as e:
+                            import logging
+                            logging.getLogger("antordrishti").warning(f"Could not log analysis step: {e}")
 
         except Exception as e:
             QMessageBox.critical(self, "Processing Error", f"Operation failed: {str(e)}")

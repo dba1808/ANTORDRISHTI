@@ -44,7 +44,7 @@ def format_file_size(size_bytes: int) -> str:
 def is_supported_image(file_path: str) -> bool:
     """Check if the file is a supported image format."""
     ext = os.path.splitext(file_path)[1].lower()
-    return ext in (".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp")
+    return ext in (".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp")
 
 
 def is_supported_pdf(file_path: str) -> bool:

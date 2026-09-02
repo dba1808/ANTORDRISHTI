@@ -24,6 +24,7 @@ class CaseModel:
     modified: Optional[datetime] = None
     status: str = "Open"
     document_ids: List[str] = field(default_factory=list)
+    events: List[Dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self):
         if self.created is None:

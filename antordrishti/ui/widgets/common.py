@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QFrame, QSlider, QSizePolicy, QGridLayout
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from PyQt5.QtGui import QCursor
+from PyQt5.QtGui import QCursor, QDragEnterEvent, QDropEvent
 
 from app.theme import Colors, Fonts, Spacing
 from app.resources import get_icon, Icons
@@ -393,58 +393,126 @@ class DocumentDropZoneWidget(QWidget):
 
     open_image_clicked = pyqtSignal()
     open_pdf_clicked = pyqtSignal()
+    file_dropped = pyqtSignal(str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+        self.setAcceptDrops(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background-color: #F8FAFC;")
+        self.setStyleSheet("""
+            DocumentDropZoneWidget {
+                background-color: #F8FAFC;
+            }
+            QFrame#DropArea {
+                background-color: #FFFFFF;
+                border: 1px dashed #475569;
+                border-radius: 8px;
+            }
+            QFrame#DropArea:hover {
+                border: 2px dashed #B08D3A;
+                background-color: #FDFDF8;
+            }
+        """)
 
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(20)
+        main_layout = QVBoxLayout(self)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+
+        self.drop_area = QFrame()
+        self.drop_area.setObjectName("DropArea")
+        self.drop_area.setMinimumSize(600, 350)
+        drop_layout = QVBoxLayout(self.drop_area)
+        drop_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        drop_layout.setSpacing(20)
 
         # Header Title
         title_box = QVBoxLayout()
-        title_box.setSpacing(4)
+        title_box.setSpacing(8)
 
-        main_title = QLabel("Add Evidence Document")
-        main_title.setStyleSheet("font-size: 18px; font-weight: 800; color: #0F172A;")
+        main_title = QLabel("DROP DOCUMENT HERE")
+        main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #0F172A; letter-spacing: 1px;")
         main_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_box.addWidget(main_title)
 
-        sub_title = QLabel("Select a document type to open or drag and drop files anywhere")
-        sub_title.setStyleSheet("font-size: 12px; color: #64748B;")
+        sub_title = QLabel("Drag & Drop an image or PDF")
+        sub_title.setStyleSheet("font-size: 13px; color: #64748B; font-weight: 500;")
         sub_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_box.addWidget(sub_title)
 
-        layout.addLayout(title_box)
+        drop_layout.addLayout(title_box)
 
-        # Dual Hover Boxes
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(24)
-        cards_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Browse Button
+        self.btn_browse = QPushButton("Browse")
+        self.btn_browse.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_browse.setFixedSize(140, 36)
+        self.btn_browse.setStyleSheet("""
+            QPushButton {
+                background-color: #0F172A;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QPushButton:hover {
+                background-color: #B08D3A;
+            }
+        """)
+        self.btn_browse.clicked.connect(self._on_browse_clicked)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        btn_layout.addWidget(self.btn_browse)
+        drop_layout.addLayout(btn_layout)
 
-        # Box 1: Image Document
-        self.img_card = DocumentTypeCard(
-            title="Image Document",
-            description="Forensic questioned image",
-            formats="JPG  •  PNG  •  TIFF  •  BMP",
-            icon_name=Icons.IMAGE_FORENSICS
+        main_layout.addWidget(self.drop_area)
+
+    def _on_browse_clicked(self):
+        from PyQt5.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Evidence Document", "",
+            "Supported Files (*.pdf *.png *.jpg *.jpeg *.bmp *.tiff *.tif *.webp);;All Files (*.*)"
         )
-        self.img_card.clicked.connect(self.open_image_clicked.emit)
-        cards_layout.addWidget(self.img_card)
+        if path:
+            self.file_dropped.emit(path)
 
-        # Box 2: PDF Document
-        self.pdf_card = DocumentTypeCard(
-            title="PDF Document",
-            description="Multi-page vector or scan",
-            formats="PDF Files (.pdf)",
-            icon_name=Icons.DOCUMENT
-        )
-        self.pdf_card.clicked.connect(self.open_pdf_clicked.emit)
-        cards_layout.addWidget(self.pdf_card)
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if urls:
+                path = urls[0].toLocalFile().lower()
+                if any(path.endswith(ext) for ext in [".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp"]):
+                    event.acceptProposedAction()
+                    self.drop_area.setStyleSheet("""
+                        QFrame#DropArea {
+                            border: 2px dashed #B08D3A;
+                            background-color: #FDFDF8;
+                            border-radius: 8px;
+                        }
+                    """)
+                    return
+        event.ignore()
 
-        layout.addLayout(cards_layout)
+    def dragLeaveEvent(self, event):
+        self.drop_area.setStyleSheet("""
+            QFrame#DropArea {
+                background-color: #FFFFFF;
+                border: 1px dashed #475569;
+                border-radius: 8px;
+            }
+            QFrame#DropArea:hover {
+                border: 2px dashed #B08D3A;
+                background-color: #FDFDF8;
+            }
+        """)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event: QDropEvent):
+        self.dragLeaveEvent(None)  # Reset style
+        if event.mimeData().hasUrls():
+            path = event.mimeData().urls()[0].toLocalFile()
+            self.file_dropped.emit(path)
+            event.acceptProposedAction()
 
 
 class EmptyStateWidget(QWidget):

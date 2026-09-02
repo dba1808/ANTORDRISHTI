@@ -1,0 +1,53 @@
+============================================================
+ANTORDRISHTI — OCR & Language Identification Report
+============================================================
+
+File: kannada.jpeg
+Date: 2026-09-02 01:53:35
+SHA-256: 9a384b8584df9352509f39fd15aadc5e08bd171d0d4cef3fe5b17910fac183c5
+
+────────────────────────────────────────────────────────────
+LANGUAGE IDENTIFICATION
+────────────────────────────────────────────────────────────
+
+Language: Kannada
+Confidence: 39.8%
+Assessment: Low
+Script: Kannada
+Pages: 1
+Words: 51
+Characters: 223
+Processing Time: 6.3s
+OCR Engine: Tesseract OCR
+
+────────────────────────────────────────────────────────────
+PROCESSING STEPS
+────────────────────────────────────────────────────────────
+
+— Deskew: Not Required
+✓ Resolution Enhancement: Very low resolution (602×452)
+— Noise Reduction: Not Required
+✓ Contrast Enhancement: Poor contrast (σ=32.3)
+— Brightness Normalization: Not Required
+— Background Normalization: Not Required
+
+────────────────────────────────────────────────────────────
+EXTRACTED TEXT
+────────────────────────────────────────────────────────────
+
+ಹ)ರುಪ್ರುಸನ್ಸೆ aes
+
+୧ എം 3੨੬੦੩ ஜி.
+ಸಂಖು 388
+8:36 & 5୧୪ ಸುತಿಯನು ,੬੦੬02੯
+
+তত ஷி அல்‌ ৪৩৪৩১
+
+ਦਿ ੧. 974 4੨8੧ iis ಕ
+ச்‌ ந்‌ re ନା *{ |
++ ੮੫ సి ச ੬ ae ಕ್ಕೇ મ వ જ
+
+ತೈಲ್ರುವರು. ತನಸುಗಳ శేజుశరంతే |
+ଖଞ୍ଜ୍୪୨୨୩ સહર aves | _
+
+_ చుఖాతి గొడ.

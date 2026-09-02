@@ -43,7 +43,7 @@ class ThumbnailButton(QPushButton):
         self.setStyleSheet("""
             ThumbnailButton {
                 background-color: #FFFFFF;
-                border: 1px solid #E2E8F0;
+                border: 1px solid #3A3A3A;
                 border-radius: 4px;
                 font-size: 10px;
                 font-weight: 600;
@@ -273,27 +273,31 @@ class ComparisonWorkspace(QWidget):
             self._update_views()
 
     def _update_views(self):
+        def _is_valid(img):
+            return img is not None and not img.isNull()
+
         if self._mode == "original":
-            if self._original_img:
+            if _is_valid(self._original_img):
                 self.single_view.set_image(self._original_img)
         elif self._mode == "processed":
-            img = self._processed_img or self._original_img
-            if img:
+            img = self._processed_img if _is_valid(self._processed_img) else self._original_img
+            if _is_valid(img):
                 self.single_view.set_image(img)
         elif self._mode == "split":
-            if self._original_img:
+            if _is_valid(self._original_img):
                 self.split_left_view.set_image(self._original_img)
-            if self._processed_img or self._original_img:
-                self.split_right_view.set_image(self._processed_img or self._original_img)
+            img_right = self._processed_img if _is_valid(self._processed_img) else self._original_img
+            if _is_valid(img_right):
+                self.split_right_view.set_image(img_right)
         elif self._mode == "overlay":
-            if self._original_img and self._processed_img:
+            if _is_valid(self._original_img) and _is_valid(self._processed_img):
                 base = self._original_img.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied)
                 overlay = self._processed_img.scaled(base.size(), Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
                 overlay = overlay.convertToFormat(QImage.Format.Format_ARGB32_Premultiplied)
 
                 blended = QImage(base.size(), QImage.Format.Format_ARGB32_Premultiplied)
                 painter = QPainter()
-                if painter.begin(blended):
+                if base.size().width() > 0 and base.size().height() > 0 and painter.begin(blended):
                     painter.drawImage(0, 0, base)
                     painter.setOpacity(self._overlay_opacity)
                     painter.drawImage(0, 0, overlay)
@@ -301,10 +305,19 @@ class ComparisonWorkspace(QWidget):
                     self.single_view.set_image(blended)
                 else:
                     self.single_view.set_image(self._processed_img)
-            elif self._processed_img:
+            elif _is_valid(self._processed_img):
                 self.single_view.set_image(self._processed_img)
-            elif self._original_img:
+            elif _is_valid(self._original_img):
                 self.single_view.set_image(self._original_img)
+
+    def clear(self):
+        self._original_img = None
+        self._processed_img = None
+        self.single_view.clear()
+        self.split_left_view.clear()
+        self.split_right_view.clear()
+        self._mode = "processed"
+        self.stack.setCurrentIndex(0)
 
 
 class DocumentViewer(QWidget):
@@ -353,8 +366,7 @@ class DocumentViewer(QWidget):
 
         # Dropzone for empty state
         self._drop_zone = DocumentDropZoneWidget()
-        self._drop_zone.open_image_clicked.connect(self.open_image_requested.emit)
-        self._drop_zone.open_pdf_clicked.connect(self.open_pdf_requested.emit)
+        self._drop_zone.file_dropped.connect(self.file_dropped.emit)
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._drop_zone)
@@ -376,7 +388,7 @@ class DocumentViewer(QWidget):
         bar.setFixedHeight(36)
         bar.setStyleSheet("""
             background-color: #FFFFFF;
-            border-bottom: 1px solid #E2E8F0;
+            border-bottom: 1px solid #3A3A3A;
         """)
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
@@ -457,7 +469,7 @@ class DocumentViewer(QWidget):
     def _build_filmstrip(self) -> QWidget:
         strip = QWidget()
         strip.setFixedWidth(130)
-        strip.setStyleSheet("background-color: #F8FAFC; border-right: 1px solid #E2E8F0;")
+        strip.setStyleSheet("background-color: #F8FAFC; border-right: 1px solid #3A3A3A;")
         strip_layout = QVBoxLayout(strip)
         strip_layout.setContentsMargins(4, 4, 4, 4)
         strip_layout.setSpacing(4)
@@ -546,7 +558,7 @@ class DocumentViewer(QWidget):
         zm_100.setStyleSheet("""
             QPushButton {
                 background: transparent;
-                border: 1px solid #E2E8F0;
+                border: 1px solid #3A3A3A;
                 border-radius: 3px;
                 font-size: 10px;
                 font-weight: 600;
@@ -696,6 +708,25 @@ class DocumentViewer(QWidget):
 
         self._update_page_label()
         self.page_changed.emit(self._current_page + 1)
+
+    def clear(self):
+        """Clear all content and reset viewer state."""
+        self._current_path = ""
+        self._current_page = 0
+        self._total_pages = 1
+        self._history.clear()
+        self._history_index = -1
+        self._comparison_ws.clear()
+        self._update_labels("No Document")
+        
+        while self._thumb_layout.count() > 1:
+            item = self._thumb_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._filmstrip_widget.setVisible(False)
+        
+        self._stack.setCurrentIndex(0)
+        self._emit_history()
 
     def _update_labels(self, name: str):
         self._doc_name_label.setText(name)

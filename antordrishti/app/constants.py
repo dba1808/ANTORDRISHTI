@@ -19,12 +19,12 @@ APP_DESCRIPTION = (
 )
 
 # ── Supported file formats ───────────────────────────────────
-IMAGE_FORMATS = ("*.jpg", "*.jpeg", "*.png", "*.tiff", "*.tif", "*.bmp")
+IMAGE_FORMATS = ("*.jpg", "*.jpeg", "*.png", "*.tiff", "*.tif", "*.bmp", "*.webp")
 PDF_FORMATS = ("*.pdf",)
 ALL_DOCUMENT_FORMATS = IMAGE_FORMATS + PDF_FORMATS
-IMAGE_FILTER = "Images (*.jpg *.jpeg *.png *.tiff *.tif *.bmp)"
+IMAGE_FILTER = "Images (*.jpg *.jpeg *.png *.tiff *.tif *.bmp *.webp)"
 PDF_FILTER = "PDF Files (*.pdf)"
-ALL_FILTER = "All Supported (*.jpg *.jpeg *.png *.tiff *.tif *.bmp *.pdf)"
+ALL_FILTER = "All Supported (*.jpg *.jpeg *.png *.tiff *.tif *.bmp *.webp *.pdf)"
 TIFF_FILTER = "TIFF Files (*.tiff *.tif)"
 ANY_FILTER = "All Files (*.*)"
 
@@ -117,3 +117,31 @@ ANALYSIS_LAYERS = [
     "Forgery Localization",
     "Annotations",
 ]
+
+
+# ── OCR Target Languages ────────────────────────────────────────
+
+OCR_INDIAN_LANGUAGES = {
+    "Assamese":    {"script": "Bengali",       "code": "asm"},
+    "Bengali":     {"script": "Bengali",       "code": "ben"},
+    "Bodo":        {"script": "Devanagari",    "code": None},
+    "Dogri":       {"script": "Devanagari",    "code": None},
+    "Gujarati":    {"script": "Gujarati",      "code": "guj"},
+    "Hindi":       {"script": "Devanagari",    "code": "hin"},
+    "Kannada":     {"script": "Kannada",       "code": "kan"},
+    "Kashmiri":    {"script": "Perso-Arabic",  "code": None},
+    "Konkani":     {"script": "Devanagari",    "code": None},
+    "Maithili":    {"script": "Devanagari",    "code": None},
+    "Malayalam":   {"script": "Malayalam",     "code": "mal"},
+    "Manipuri":    {"script": "Meitei Mayek",  "code": "mni"},
+    "Marathi":     {"script": "Devanagari",    "code": "mar"},
+    "Nepali":      {"script": "Devanagari",    "code": "nep"},
+    "Odia":        {"script": "Odia",          "code": "ori"},
+    "Punjabi":     {"script": "Gurmukhi",      "code": "pan"},
+    "Sanskrit":    {"script": "Devanagari",    "code": "san"},
+    "Santali":     {"script": "Ol Chiki",      "code": "sat"},
+    "Sindhi":      {"script": "Perso-Arabic",  "code": "snd"},
+    "Tamil":       {"script": "Tamil",         "code": "tam"},
+    "Telugu":      {"script": "Telugu",        "code": "tel"},
+    "Urdu":        {"script": "Perso-Arabic",  "code": "urd"},
+}

@@ -10,7 +10,7 @@ import logging
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter,
     QStackedWidget, QTabWidget, QFileDialog, QMessageBox, QApplication,
-    QShortcut
+    QShortcut, QLabel, QPushButton, QFrame
 )
 from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QImage, QKeySequence
@@ -56,9 +56,11 @@ from ui.dialogs.command_palette import CommandPalette, CommandItem
 from services.document_service import load_document
 from services.hash_service import calculate_hashes
 from services.db_service import get_db
+from services.app_state import get_app_state, CurrentDocumentContext
 
 # Models
 from models.case_model import CaseModel
+from models.evidence_model import EvidenceModel
 
 logger = logging.getLogger("antordrishti")
 
@@ -75,8 +77,10 @@ class MainWindow(QMainWindow):
 
         # State
         self._current_case = None
+        self._current_evidence = None
         self._current_document = None
         self._open_documents = {}  # path -> tab_index
+        self._app_state = get_app_state()
 
         # Build UI
         self._build_ui()
@@ -121,6 +125,9 @@ class MainWindow(QMainWindow):
         workspace_layout = QVBoxLayout(workspace_container)
         workspace_layout.setContentsMargins(0, 0, 0, 0)
         workspace_layout.setSpacing(0)
+
+        self._current_doc_bar = self._build_current_document_bar()
+        workspace_layout.addWidget(self._current_doc_bar)
 
         self._tab_widget = QTabWidget()
         self._tab_widget.setTabsClosable(True)
@@ -182,7 +189,7 @@ class MainWindow(QMainWindow):
         # Make first tab (Dashboard) not closeable
         self._tab_widget.tabBar().setTabButton(0, self._tab_widget.tabBar().ButtonPosition.RightSide, None)
 
-        workspace_layout.addWidget(self._tab_widget)
+        workspace_layout.addWidget(self._tab_widget, 1)
         self._main_splitter.addWidget(workspace_container)
 
         # Inspector panel
@@ -331,6 +338,98 @@ class MainWindow(QMainWindow):
             self._on_verify_hash
         )
 
+        ocr_page = self._workspace.widget(self._pages[NavPage.OCR.value])
+        if hasattr(ocr_page, "document_import_requested"):
+            ocr_page.document_import_requested.connect(self._load_document)
+
+        self._app_state.context_changed.connect(self._on_context_changed)
+
+    def _build_current_document_bar(self) -> QFrame:
+        """Create the visible active evidence/document indicator."""
+        bar = QFrame()
+        bar.setFixedHeight(50)
+        bar.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-bottom: 1px solid #1F2937;
+            }
+            QLabel#ContextKicker {
+                font-size: 9px;
+                font-weight: 800;
+                color: #475569;
+                letter-spacing: 1px;
+            }
+            QLabel#ContextMain {
+                font-size: 13px;
+                font-weight: 700;
+                color: #0F172A;
+            }
+            QLabel#ContextSub {
+                font-size: 11px;
+                color: #64748B;
+            }
+            QPushButton {
+                background-color: #FFFFFF;
+                border: 1px solid #334155;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #0F172A;
+            }
+            QPushButton:hover {
+                background-color: #F8FAFC;
+            }
+        """)
+
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(14, 5, 14, 5)
+        layout.setSpacing(10)
+
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(1)
+
+        self._context_kicker = QLabel("CURRENT EVIDENCE")
+        self._context_kicker.setObjectName("ContextKicker")
+        self._context_main = QLabel("No active document")
+        self._context_main.setObjectName("ContextMain")
+        self._context_sub = QLabel("Open an image or PDF to begin analysis.")
+        self._context_sub.setObjectName("ContextSub")
+
+        text_col.addWidget(self._context_kicker)
+        text_col.addWidget(self._context_main)
+        text_col.addWidget(self._context_sub)
+        layout.addLayout(text_col, 1)
+
+        self._btn_context_open = QPushButton("Open")
+        self._btn_context_change = QPushButton("Change Document")
+        self._btn_context_close = QPushButton("X")
+        self._btn_context_close.setToolTip("Close current document")
+        self._btn_context_close.setStyleSheet("""
+            QPushButton {
+                background-color: #FFFFFF;
+                border: 1px solid #94A3B8;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 800;
+                color: #C62828;
+            }
+            QPushButton:hover {
+                background-color: #FEE2E2;
+                border-color: #EF4444;
+            }
+        """)
+
+        self._btn_context_open.clicked.connect(self._on_open_document)
+        self._btn_context_change.clicked.connect(self._on_open_document)
+        self._btn_context_close.clicked.connect(self._on_close_document)
+        layout.addWidget(self._btn_context_open)
+        layout.addWidget(self._btn_context_change)
+        layout.addWidget(self._btn_context_close)
+        return bar
+
     # ── Tab Management ───────────────────────────────────────
 
     def _on_tab_close(self, index: int):
@@ -427,6 +526,13 @@ class MainWindow(QMainWindow):
                 ela_page: ELAPage = self._workspace.widget(idx)
                 if not ela_page.viewer.get_current_image():
                     ela_page.load_document(self._current_document.file_path)
+            # Synchronize document with OCR page if switching to OCR
+            if page_name == NavPage.OCR.value and self._current_document:
+                ocr_page = self._workspace.widget(idx)
+                if hasattr(ocr_page, "set_current_context"):
+                    ocr_page.set_current_context(self._app_state.context)
+                elif hasattr(ocr_page, "load_document"):
+                    ocr_page.load_document(self._current_document.file_path)
 
     def _switch_page(self, page_name: str):
         idx = self._pages.get(page_name)
@@ -483,6 +589,10 @@ class MainWindow(QMainWindow):
                 )
                 return
 
+            case = self._ensure_current_case()
+            evidence = self._register_current_evidence(case, doc)
+            self._current_case = case
+            self._current_evidence = evidence
             self._current_document = doc
 
             # Switch to document analysis
@@ -494,21 +604,11 @@ class MainWindow(QMainWindow):
             )
             doc_page.document_viewer.load_file(path)
 
-            # Also prepare ELA page
-            ela_page: ELAPage = self._workspace.widget(
-                self._pages[NavPage.ELA.value]
-            )
-            ela_page.load_document(path)
-
-            # Also prepare Noise Analysis page if it exists
-            noise_idx = self._pages.get(NavPage.NOISE_ANALYSIS.value)
-            if noise_idx is not None:
-                noise_page = self._workspace.widget(noise_idx)
-                if hasattr(noise_page, "load_document"):
-                    noise_page.load_document(path)
-
             # Update inspector
             self._inspector.update_document(doc)
+
+            self._app_state.set_current_context(case, evidence, doc)
+            self._sync_context_to_pages(self._app_state.context)
 
             # Update status bar
             self._status_bar.set_document(doc.file_name)
@@ -525,6 +625,15 @@ class MainWindow(QMainWindow):
             try:
                 db = get_db()
                 db.add_recent_file(path, doc.file_name, doc.file_type)
+                if self._current_case:
+                    db._conn.execute(
+                        """INSERT INTO case_events
+                           (case_id, evidence_id, event_type, description, timestamp)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (self._current_case.case_id, self._current_evidence.evidence_id if self._current_evidence else "",
+                         "Document Loaded", f"Loaded {doc.file_name}", __import__('datetime').datetime.now().isoformat())
+                    )
+                    db._conn.commit()
             except Exception:
                 pass
 
@@ -547,7 +656,8 @@ class MainWindow(QMainWindow):
 
     def _on_document_loaded(self, path: str):
         """Handle document loaded signal from viewer."""
-        pass
+        if path and (not self._current_document or self._current_document.file_path != path):
+            self._load_document(path)
 
     def _on_page_changed(self, page_num: int):
         if self._current_document:
@@ -556,6 +666,158 @@ class MainWindow(QMainWindow):
     def _on_file_dropped(self, path: str):
         """Handle file dropped onto viewer."""
         self._load_document(path)
+
+    def _ensure_current_case(self) -> CaseModel:
+        """Ensure every evidence item belongs to a case."""
+        if self._current_case:
+            return self._current_case
+
+        db = get_db()
+        year = __import__("datetime").datetime.now().strftime("%Y")
+        index = db.get_case_count() + 1
+        case_id = f"ANT-{year}-{index:03d}"
+        while db.get_case(case_id):
+            index += 1
+            case_id = f"ANT-{year}-{index:03d}"
+
+        case = CaseModel(
+            case_id=case_id,
+            title="Untitled OCR Evidence Case",
+            description="Auto-created case for imported evidence.",
+            status="Open",
+        )
+        db.create_case(case.to_dict())
+        
+        try:
+            db._conn.execute(
+                """INSERT INTO case_events
+                   (case_id, evidence_id, event_type, description, timestamp)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (case_id, "", "Case Created", "Auto-created case for imported evidence", __import__('datetime').datetime.now().isoformat())
+            )
+            db._conn.commit()
+        except Exception:
+            pass
+            
+        self._status_bar.set_case(case.case_id)
+        return case
+
+    def _register_current_evidence(self, case: CaseModel, doc) -> EvidenceModel:
+        """Create or reuse the evidence row for the loaded document."""
+        db = get_db()
+        existing = db.get_evidence_by_path(case.case_id, doc.file_path)
+        if existing:
+            evidence = EvidenceModel.from_dict(existing)
+            evidence.sha256 = doc.sha256
+            evidence.md5 = doc.md5
+            return evidence
+
+        evidence = EvidenceModel(
+            evidence_id=db.generate_evidence_id(case.case_id),
+            case_id=case.case_id,
+            name=doc.file_name,
+            evidence_type="Original Evidence",
+            source=doc.file_path,
+            file_path=doc.file_path,
+            sha256=doc.sha256,
+            md5=doc.md5,
+            status="Verified" if doc.sha256 else "Pending",
+            reviewed=False,
+            relevant=True,
+        )
+        data = evidence.to_dict()
+        data["file_type"] = doc.file_type
+        data["file_size"] = doc.file_size
+        db.add_evidence(data)
+        db.add_processing_history(
+            case.case_id,
+            evidence.evidence_id,
+            "Evidence imported",
+            {
+                "filename": doc.file_name,
+                "sha256": doc.sha256,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+            },
+        )
+        return evidence
+
+    def _sync_context_to_pages(self, context: CurrentDocumentContext):
+        """Push the current evidence/document to modules that can use it."""
+        for page_name, idx in self._pages.items():
+            page = self._workspace.widget(idx)
+            if hasattr(page, "set_current_context"):
+                page.set_current_context(context)
+            elif context.document and hasattr(page, "load_document"):
+                try:
+                    page.load_document(context.document.file_path)
+                except TypeError:
+                    pass
+
+    def _on_context_changed(self, context: CurrentDocumentContext):
+        """Update the current evidence bar from shared state."""
+        evidence = context.evidence
+        doc = context.document
+        case = context.case
+
+        if not doc:
+            case_text = f"Case {case.case_id}" if case else "No active case"
+            self._context_main.setText("No active document")
+            self._context_sub.setText(f"{case_text}. Open an image or PDF to begin analysis.")
+            self._btn_context_close.setEnabled(False)
+            return
+
+        evidence_id = evidence.evidence_id if evidence else "EVD----"
+        self._context_main.setText(f"{evidence_id}  |  {doc.file_name}")
+        self._context_sub.setText(
+            f"Case {case.case_id if case else 'Unassigned'}  |  "
+            f"{doc.file_type or 'Document'}  |  Page {doc.current_page} / {max(1, doc.page_count)}  |  "
+            f"Original Evidence  |  Integrity {doc.integrity_status}"
+        )
+        self._btn_context_close.setEnabled(True)
+
+    def _on_close_document(self):
+        """Close the active document while preserving the current case."""
+        if self._current_evidence and self._current_evidence.status == "Pending":
+            reply = QMessageBox.question(
+                self, "Unsaved Evidence",
+                "This document has not been explicitly saved to the case.\n\n"
+                "Closing it will clear the active workspace. Do you want to proceed?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                return
+
+        try:
+            if self._current_case and self._current_evidence:
+                db = get_db()
+                db._conn.execute(
+                    """INSERT INTO case_events
+                       (case_id, evidence_id, event_type, description, timestamp)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (self._current_case.case_id, self._current_evidence.evidence_id, 
+                     "Document Closed", "Closed active document", __import__('datetime').datetime.now().isoformat())
+                )
+                db._conn.commit()
+        except Exception:
+            pass
+
+        self._current_document = None
+        self._current_evidence = None
+        self._app_state.clear_document(keep_case=True)
+        self._inspector.update_document(None)
+        self._status_bar.set_document("")
+        self._status_bar.set_page(0, 0)
+        self._status_bar.set_integrity("")
+        ocr_page = self._workspace.widget(self._pages[NavPage.OCR.value])
+        if hasattr(ocr_page, "reset_workspace"):
+            ocr_page.reset_workspace(clear_document=True)
+
+        doc_page = self._workspace.widget(self._pages[NavPage.DOCUMENT_ANALYSIS.value])
+        if hasattr(doc_page, "clear_workspace"):
+            doc_page.clear_workspace()
+
+        self.statusBar().showMessage("Current document closed. Case remains open.", 3000)
 
     def _on_save_processed(self):
         """Save the current working copy/processed image to a user-specified path."""
@@ -684,11 +946,11 @@ class MainWindow(QMainWindow):
             )
 
     def _on_new_workspace(self):
-        """Clear current case and reset workspace."""
+        """Clear current document and processing state without deleting the case."""
         reply = QMessageBox.question(
             self, "New Workspace",
-            "This will close the current case and all open documents.\n"
-            "Unsaved changes will be lost.\n\n"
+            "This will clear the active document, working image, and OCR results.\n"
+            "The current case remains saved in the database.\n\n"
             "Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
@@ -701,17 +963,17 @@ class MainWindow(QMainWindow):
             self._tab_widget.removeTab(1)
         self._open_documents.clear()
 
-        # Reset case
-        self._current_case = None
         self._current_document = None
+        self._current_evidence = None
+        self._app_state.clear_document(keep_case=True)
 
         # Reset to dashboard
         self._switch_page(NavPage.DASHBOARD.value)
 
         # Reset status bar
         self._status_bar.set_status(AppStatus.READY)
-        self._status_bar.set_case("")
         self._status_bar.set_document("")
+        self._status_bar.set_page(0, 0)
 
         self.statusBar().showMessage("Workspace reset.", 3000)
 

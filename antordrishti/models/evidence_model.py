@@ -5,7 +5,7 @@ With SQLite serialization and auto-generated evidence IDs.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, List, Dict, Any
 
 
 @dataclass
@@ -26,9 +26,16 @@ class EvidenceModel:
     reviewed: bool = False
     relevant: bool = False
 
+    file_type: str = ""
+    file_size: int = 0
+    imported_at: Optional[datetime] = None
+    ocr_runs: List[Dict[str, Any]] = field(default_factory=list)
+
     def __post_init__(self):
         if self.created is None:
             self.created = datetime.now()
+        if self.imported_at is None:
+            self.imported_at = datetime.now()
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary for SQLite storage."""
@@ -45,15 +52,23 @@ class EvidenceModel:
             "notes": self.notes,
             "reviewed": self.reviewed,
             "relevant": self.relevant,
+            "file_type": self.file_type,
+            "file_size": self.file_size,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EvidenceModel":
         """Deserialize from a SQLite row dictionary."""
         created = None
+        imported_at = None
         if data.get("created_at"):
             try:
                 created = datetime.fromisoformat(data["created_at"])
+            except (ValueError, TypeError):
+                pass
+        if data.get("imported_at"):
+            try:
+                imported_at = datetime.fromisoformat(data["imported_at"])
             except (ValueError, TypeError):
                 pass
 
@@ -70,5 +85,8 @@ class EvidenceModel:
             notes=data.get("notes", ""),
             reviewed=bool(data.get("reviewed", False)),
             relevant=bool(data.get("relevant", False)),
+            file_type=data.get("file_type", ""),
+            file_size=int(data.get("file_size", 0) or 0),
             created=created,
+            imported_at=imported_at,
         )
