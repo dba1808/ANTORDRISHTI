@@ -30,21 +30,29 @@ class EvidenceManagerPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Title
+        # Title Bar
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
+        title_bar.setFixedHeight(48)
         title_bar.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
+            background-color: {Colors.CANVAS};
             border-bottom: 1px solid {Colors.BORDER_LIGHT};
         """)
         tb = QHBoxLayout(title_bar)
-        tb.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
-        t = QLabel("Evidence Manager")
-        t.setProperty("heading", True)
+        tb.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
+        t = QLabel("Evidence Management")
+        t.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
         tb.addWidget(t)
         
+        tb.addSpacing(12)
         self._case_label = QLabel()
-        self._case_label.setStyleSheet(f"color: {Colors.TEXT_TERTIARY}; font-size: 11px;")
+        self._case_label.setStyleSheet(f"""
+            background-color: {Colors.PANEL_ALT};
+            border: 1px solid {Colors.BORDER};
+            border-radius: 4px;
+            color: {Colors.TEXT_SECONDARY};
+            font-size: 11px;
+            padding: 2px 8px;
+        """)
         tb.addWidget(self._case_label)
         
         tb.addStretch()

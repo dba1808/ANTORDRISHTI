@@ -30,6 +30,26 @@ def calculate_hashes(file_path: str) -> Tuple[str, str]:
         return ("", "")
 
 
+def calculate_sha256(file_path: str) -> str:
+    """Calculate SHA-256 hash for a file.
+
+    Returns:
+        SHA-256 hex string, or empty string on error.
+    """
+    sha256, _ = calculate_hashes(file_path)
+    return sha256
+
+
+def calculate_md5(file_path: str) -> str:
+    """Calculate MD5 hash for a file.
+
+    Returns:
+        MD5 hex string, or empty string on error.
+    """
+    _, md5 = calculate_hashes(file_path)
+    return md5
+
+
 def verify_hash(file_path: str, expected_hash: str,
                 algorithm: str = "sha256") -> Optional[bool]:
     """Verify a file against an expected hash.

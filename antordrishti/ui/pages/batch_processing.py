@@ -22,16 +22,17 @@ class BatchProcessingPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # Title Bar
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
+        title_bar.setFixedHeight(48)
         title_bar.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
+            background-color: {Colors.CANVAS};
             border-bottom: 1px solid {Colors.BORDER_LIGHT};
         """)
         tb = QHBoxLayout(title_bar)
-        tb.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
-        t = QLabel("Batch Processing")
-        t.setProperty("heading", True)
+        tb.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
+        t = QLabel("Batch Forensic Examination")
+        t.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
         tb.addWidget(t)
         tb.addStretch()
         layout.addWidget(title_bar)
@@ -103,17 +104,17 @@ class BatchProcessingPage(QWidget):
 
         # Right: Analysis selection
         right = QFrame()
-        right.setFixedWidth(240)
+        right.setFixedWidth(260)
         right.setStyleSheet(f"""
             QFrame {{
-                background-color: {Colors.PANEL};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
+                background-color: {Colors.CANVAS};
+                border: 1px solid {Colors.BORDER_LIGHT};
+                border-radius: 8px;
             }}
         """)
         r_layout = QVBoxLayout(right)
-        r_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        r_layout.setSpacing(Spacing.SM)
+        r_layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        r_layout.setSpacing(Spacing.MD)
 
         r_layout.addWidget(SectionLabel("Analysis Selection"))
 

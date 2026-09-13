@@ -21,7 +21,7 @@ class InspectorPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setMinimumWidth(260)
         self.setMaximumWidth(360)
         self.setStyleSheet("""
@@ -58,7 +58,7 @@ class InspectorPanel(QWidget):
         scroll.setStyleSheet("background-color: #FFFFFF;")
 
         container = QWidget()
-        container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         container.setStyleSheet("background-color: #FFFFFF;")
         self._container_layout = QVBoxLayout(container)
         self._container_layout.setContentsMargins(0, 0, 0, 0)

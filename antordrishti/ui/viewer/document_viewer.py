@@ -43,7 +43,7 @@ class ThumbnailButton(QPushButton):
         self.setStyleSheet("""
             ThumbnailButton {
                 background-color: #FFFFFF;
-                border: 1px solid #3A3A3A;
+                border: 1px solid #E2E8F0;
                 border-radius: 4px;
                 font-size: 10px;
                 font-weight: 600;
@@ -53,14 +53,14 @@ class ThumbnailButton(QPushButton):
                 padding-bottom: 4px;
             }
             ThumbnailButton:hover {
-                border-color: #0D7C7C;
-                background-color: #F0FDFA;
-                color: #0D7C7C;
+                border-color: #CBD5E1;
+                background-color: #F8FAFC;
+                color: #0F172A;
             }
             ThumbnailButton:checked {
-                border: 2px solid #0D7C7C;
-                background-color: #E6F4F8;
-                color: #0D7C7C;
+                border: 2px solid #B08D3A;
+                background-color: #FAF4E6;
+                color: #785F23;
                 font-weight: 700;
             }
         """)
@@ -219,7 +219,7 @@ class ComparisonWorkspace(QWidget):
         self.split_widget = QWidget()
         split_layout = QHBoxLayout(self.split_widget)
         split_layout.setContentsMargins(0, 0, 0, 0)
-        split_layout.setSpacing(1)
+        split_layout.setSpacing(0)
 
         # Left: Original View
         left_box = QWidget()
@@ -228,11 +228,17 @@ class ComparisonWorkspace(QWidget):
         left_layout.setSpacing(0)
         lbl_left = QLabel("  ORIGINAL EVIDENCE")
         lbl_left.setFixedHeight(24)
-        lbl_left.setStyleSheet("background-color: #E2E8F0; font-size: 10px; font-weight: 700; color: #475569;")
+        lbl_left.setStyleSheet("background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 10px; font-weight: 700; color: #475569;")
         left_layout.addWidget(lbl_left)
         self.split_left_view = SingleGraphicsView()
         left_layout.addWidget(self.split_left_view)
         split_layout.addWidget(left_box, 1)
+
+        # Thin divider
+        div = QFrame()
+        div.setFrameShape(QFrame.Shape.VLine)
+        div.setStyleSheet("background-color: #E2E8F0; max-width: 1px; border: none;")
+        split_layout.addWidget(div)
 
         # Right: Processed View
         right_box = QWidget()
@@ -241,11 +247,25 @@ class ComparisonWorkspace(QWidget):
         right_layout.setSpacing(0)
         lbl_right = QLabel("  PROCESSED / FILTERED")
         lbl_right.setFixedHeight(24)
-        lbl_right.setStyleSheet("background-color: #E6F4F8; font-size: 10px; font-weight: 700; color: #0D7C7C;")
+        lbl_right.setStyleSheet("background-color: #FAF4E6; border-bottom: 1px solid #F5EACB; font-size: 10px; font-weight: 700; color: #785F23;")
         right_layout.addWidget(lbl_right)
         self.split_right_view = SingleGraphicsView()
         right_layout.addWidget(self.split_right_view)
         split_layout.addWidget(right_box, 1)
+
+        # Synchronize scrollbars between left & right views for synchronous panning
+        self.split_left_view.horizontalScrollBar().valueChanged.connect(
+            self.split_right_view.horizontalScrollBar().setValue
+        )
+        self.split_right_view.horizontalScrollBar().valueChanged.connect(
+            self.split_left_view.horizontalScrollBar().setValue
+        )
+        self.split_left_view.verticalScrollBar().valueChanged.connect(
+            self.split_right_view.verticalScrollBar().setValue
+        )
+        self.split_right_view.verticalScrollBar().valueChanged.connect(
+            self.split_left_view.verticalScrollBar().setValue
+        )
 
         self.stack.addWidget(self.split_widget)
         layout.addWidget(self.stack, 1)
@@ -388,10 +408,10 @@ class DocumentViewer(QWidget):
         bar.setFixedHeight(36)
         bar.setStyleSheet("""
             background-color: #FFFFFF;
-            border-bottom: 1px solid #3A3A3A;
+            border-bottom: 1px solid #E2E8F0;
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(8)
 
         # Document Title
@@ -403,7 +423,7 @@ class DocumentViewer(QWidget):
 
         # Comparison Mode Selector
         comp_label = QLabel("VIEW:")
-        comp_label.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B;")
+        comp_label.setStyleSheet("font-size: 10px; font-weight: 700; color: #64748B; letter-spacing: 0.5px;")
         layout.addWidget(comp_label)
 
         self.btn_view_proc = QPushButton("Processed")
@@ -428,21 +448,21 @@ class DocumentViewer(QWidget):
                 QPushButton {
                     background-color: #FFFFFF;
                     border: 1px solid #CBD5E1;
-                    border-radius: 3px;
-                    padding: 2px 8px;
+                    border-radius: 4px;
+                    padding: 2px 10px;
                     font-size: 11px;
                     font-weight: 500;
                     color: #334155;
                 }
                 QPushButton:hover {
-                    background-color: #F1F5F9;
+                    background-color: #F8FAFC;
                     color: #0F172A;
                 }
                 QPushButton:checked {
-                    background-color: #E6F4F8;
-                    border-color: #0D7C7C;
-                    color: #0D7C7C;
-                    font-weight: 700;
+                    background-color: #FAF4E6;
+                    border: 1px solid #B08D3A;
+                    color: #785F23;
+                    font-weight: 600;
                 }
             """)
             btn.clicked.connect(lambda _, m=mode, b=btn: self._on_mode_button_clicked(m, b))
@@ -469,7 +489,7 @@ class DocumentViewer(QWidget):
     def _build_filmstrip(self) -> QWidget:
         strip = QWidget()
         strip.setFixedWidth(130)
-        strip.setStyleSheet("background-color: #F8FAFC; border-right: 1px solid #3A3A3A;")
+        strip.setStyleSheet("background-color: #F8FAFC; border-right: 1px solid #E2E8F0;")
         strip_layout = QVBoxLayout(strip)
         strip_layout.setContentsMargins(4, 4, 4, 4)
         strip_layout.setSpacing(4)
@@ -557,15 +577,15 @@ class DocumentViewer(QWidget):
         zm_100.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         zm_100.setStyleSheet("""
             QPushButton {
-                background: transparent;
-                border: 1px solid #3A3A3A;
+                background: #FFFFFF;
+                border: 1px solid #CBD5E1;
                 border-radius: 3px;
                 font-size: 10px;
                 font-weight: 600;
                 color: #334155;
             }
             QPushButton:hover {
-                background-color: #F1F5F9;
+                background-color: #F8FAFC;
                 color: #0F172A;
             }
         """)

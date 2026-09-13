@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QImage, QPixmap, QFont, QCursor, QColor
 
-from app.theme import Colors, Spacing, Fonts
+from app.theme import Colors, Spacing, Fonts, Bg, Border, Text, Brand
 from app.resources import Icons, get_icon
 from ui.widgets.common import (
     SectionLabel, ActionButton, Separator, CollapsibleSection, InfoRow,
@@ -95,8 +95,8 @@ class LanguageResultCard(QFrame):
         self.setStyleSheet("""
             LanguageResultCard {
                 background-color: #FFFFFF;
-                border: 1px solid #3A3A3A;
-                border-radius: 8px;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
             }
         """)
 
@@ -387,7 +387,7 @@ class OCRPage(QWidget):
 
         # ── Main Splitter ────────────────────────────────
         self.main_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.main_splitter.setStyleSheet("QSplitter::handle { background-color: #3A3A3A; height: 1px; }")
+        self.main_splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; height: 1px; }")
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet("""
@@ -408,13 +408,13 @@ class OCRPage(QWidget):
 
         # Preview toggle bar
         toggle_bar = QWidget()
-        toggle_bar.setFixedHeight(32)
+        toggle_bar.setFixedHeight(34)
         toggle_bar.setStyleSheet(
-            "background-color: #F8FAFC; border-bottom: 1px solid #3A3A3A;"
+            "background-color: #FFFFFF; border-bottom: 1px solid #E2E8F0;"
         )
         toggle_layout = QHBoxLayout(toggle_bar)
-        toggle_layout.setContentsMargins(8, 0, 8, 0)
-        toggle_layout.setSpacing(4)
+        toggle_layout.setContentsMargins(10, 0, 10, 0)
+        toggle_layout.setSpacing(6)
 
         self._btn_original = QPushButton("Original")
         self._btn_original.setCheckable(True)
@@ -423,11 +423,11 @@ class OCRPage(QWidget):
         self._btn_enhanced = QPushButton("OCR Enhanced")
         self._btn_enhanced.setCheckable(True)
         self._btn_enhanced.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self._btn_regions = QPushButton("SHOW OCR REGIONS")
+        self._btn_regions = QPushButton("OCR Regions")
         self._btn_regions.setCheckable(True)
         self._btn_regions.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         
-        self._btn_split = QPushButton("SPLIT VIEW")
+        self._btn_split = QPushButton("Split View")
         self._btn_split.setCheckable(True)
         self._btn_split.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
@@ -435,21 +435,23 @@ class OCRPage(QWidget):
             btn.setFixedHeight(24)
             btn.setStyleSheet("""
                 QPushButton {
-                    background-color: transparent;
+                    background-color: #FFFFFF;
                     border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     padding: 0 10px;
-                    font-size: 10px;
-                    font-weight: 600;
-                    color: #64748B;
+                    font-size: 11px;
+                    font-weight: 500;
+                    color: #475569;
+                }
+                QPushButton:hover {
+                    background-color: #F8FAFC;
+                    color: #0F172A;
                 }
                 QPushButton:checked {
-                    background-color: #0D7C7C;
-                    border-color: #0D7C7C;
-                    color: #FFFFFF;
-                }
-                QPushButton:hover:!checked {
-                    background-color: #F1F5F9;
+                    background-color: #FAF4E6;
+                    border-color: #B08D3A;
+                    color: #785F23;
+                    font-weight: 600;
                 }
             """)
 
@@ -462,6 +464,13 @@ class OCRPage(QWidget):
         toggle_layout.addWidget(self._btn_enhanced)
         toggle_layout.addWidget(self._btn_regions)
         toggle_layout.addWidget(self._btn_split)
+
+        # Compact confidence legend
+        legend = QLabel("<span style='color:#16A34A;'>● High</span>  <span style='color:#D97706;'>● Med</span>  <span style='color:#DC2626;'>● Low</span>")
+        legend.setTextFormat(Qt.TextFormat.RichText)
+        legend.setStyleSheet("font-size: 10px; padding-left: 6px;")
+        toggle_layout.addWidget(legend)
+
         toggle_layout.addStretch()
 
         # File info label
@@ -511,17 +520,30 @@ class OCRPage(QWidget):
         """)
 
         right_panel = QWidget()
-        right_panel.setMinimumWidth(420)
-        right_panel.setMaximumWidth(560)
+        right_panel.setMinimumWidth(320)
+        right_panel.setMaximumWidth(380)
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(
             Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD
         )
         right_layout.setSpacing(Spacing.SM)
 
-        # ── Language Result Card ─────────────────────────
+        # ── Language Result Card (Analysis Summary) ──────
         self._result_card = LanguageResultCard()
         right_layout.addWidget(self._result_card)
+
+        # ── Region Information (Requirement 16) ──────────
+        self._region_section = CollapsibleSection("Region Information")
+        self._reg_id = InfoRow("Region ID", "—")
+        self._reg_text = InfoRow("Text", "—")
+        self._reg_conf = InfoRow("Confidence", "—")
+        self._reg_engine = InfoRow("Engine", "—")
+        self._reg_lang = InfoRow("Language", "—")
+        self._reg_page = InfoRow("Page", "—")
+        self._reg_box = InfoRow("Bounding Box", "—")
+        for w in [self._reg_id, self._reg_text, self._reg_conf, self._reg_engine, self._reg_lang, self._reg_page, self._reg_box]:
+            self._region_section.add_widget(w)
+        right_layout.addWidget(self._region_section)
 
         # ── Processing Status ────────────────────────────
         self._processing_section = CollapsibleSection("Processing Status")
@@ -676,7 +698,7 @@ class OCRPage(QWidget):
         bottom_layout.addWidget(SectionLabel("Analysis & Results"))
         
         self._text_tabs = QTabWidget()
-        self._text_tabs.setStyleSheet("QTabWidget::pane { border: 1px solid #2B2B2B; background-color: #FFFFFF; }")
+        self._text_tabs.setStyleSheet(f"QTabWidget::pane {{ border: 1px solid {Border.DEFAULT}; background-color: {Bg.WHITE}; border-radius: 4px; }}")
         
         # 1. RAW / NORMALIZED
         text_widget = QWidget()

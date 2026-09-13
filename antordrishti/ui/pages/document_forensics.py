@@ -37,21 +37,29 @@ class DocumentForensicsPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # Title Bar
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
+        title_bar.setFixedHeight(48)
         title_bar.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
+            background-color: {Colors.CANVAS};
             border-bottom: 1px solid {Colors.BORDER_LIGHT};
         """)
         tb_layout = QHBoxLayout(title_bar)
-        tb_layout.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
-        title = QLabel("Document Forensics")
-        title.setProperty("heading", True)
+        tb_layout.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
+        title = QLabel("Questioned Document Forensics")
+        title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
         tb_layout.addWidget(title)
         tb_layout.addStretch()
         layout.addWidget(title_bar)
 
         tabs = QTabWidget()
+        tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {Colors.BORDER_LIGHT};
+                background-color: {Colors.CANVAS};
+                border-radius: 6px;
+            }}
+        """)
 
         tabs.addTab(
             _make_doc_tab("Typography Profiler", [

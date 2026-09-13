@@ -1,7 +1,7 @@
 """
-Antordrishti — Reusable Widgets
+Antordrishti — Reusable Forensic Widgets
 Collapsible section, status indicator, labeled slider, info row, document dropzone.
-All components use a professional white/light forensic theme.
+Light forensic workstation theme with clean soft containers and restrained gold accents.
 """
 
 from typing import Optional
@@ -22,7 +22,7 @@ class CollapsibleSection(QWidget):
 
     def __init__(self, title: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self._expanded = True
 
         self.setStyleSheet("""
@@ -38,7 +38,7 @@ class CollapsibleSection(QWidget):
 
         # Header
         self._header = QPushButton(f"  {title}")
-        self._header.setIcon(get_icon(Icons.EXPAND, "#334155"))
+        self._header.setIcon(get_icon(Icons.EXPAND, "#475569"))
         self._header.setIconSize(QSize(14, 14))
         self._header.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._header.setStyleSheet("""
@@ -47,15 +47,15 @@ class CollapsibleSection(QWidget):
                 border: none;
                 border-bottom: 1px solid #E2E8F0;
                 text-align: left;
-                padding: 7px 10px;
+                padding: 7px 12px;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 600;
                 color: #0F172A;
-                letter-spacing: 0.5px;
+                letter-spacing: 0.3px;
             }
             QPushButton:hover {
                 background-color: #F1F5F9;
-                color: #0D7C7C;
+                color: #B08D3A;
             }
         """)
         self._header.clicked.connect(self._toggle)
@@ -63,7 +63,7 @@ class CollapsibleSection(QWidget):
 
         # Content Container
         self._content = QWidget()
-        self._content.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self._content.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self._content.setStyleSheet("background-color: #FFFFFF;")
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(12, 10, 12, 12)
@@ -85,15 +85,15 @@ class CollapsibleSection(QWidget):
         self._expanded = not self._expanded
         self._content.setVisible(self._expanded)
         icon = Icons.EXPAND if self._expanded else Icons.COLLAPSE
-        self._header.setIcon(get_icon(icon, "#334155"))
+        self._header.setIcon(get_icon(icon, "#475569"))
 
 
 class StatusIndicator(QWidget):
-    """A colored dot with label for status display."""
+    """A colored dot with label for compact status display."""
 
     def __init__(self, text: str = "", status: str = "ready", parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: transparent;")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -102,7 +102,7 @@ class StatusIndicator(QWidget):
         self._dot = QLabel("●")
         self._dot.setFixedWidth(12)
         self._label = QLabel(text)
-        self._label.setStyleSheet("font-size: 11px; color: #1E293B; font-weight: 600;")
+        self._label.setStyleSheet("font-size: 11px; color: #0F172A; font-weight: 500;")
 
         layout.addWidget(self._dot)
         layout.addWidget(self._label)
@@ -111,16 +111,16 @@ class StatusIndicator(QWidget):
         self.set_status(status)
 
     def set_status(self, status: str):
-        """Set status: 'ready', 'warning', 'error', 'pending', 'verified'."""
+        """Set status: 'ready', 'warning', 'error', 'pending', 'verified', 'processing'."""
         color_map = {
             "ready": Colors.SUCCESS,
             "verified": Colors.SUCCESS,
             "warning": Colors.WARNING,
             "error": Colors.ERROR,
-            "pending": "#64748B",
+            "pending": Colors.TEXT_TERTIARY,
             "processing": Colors.ACCENT,
         }
-        color = color_map.get(status, "#64748B")
+        color = color_map.get(status.lower(), Colors.TEXT_TERTIARY)
         self._dot.setStyleSheet(f"color: {color}; font-size: 10px;")
 
     def set_text(self, text: str):
@@ -135,7 +135,7 @@ class LabeledSlider(QWidget):
     def __init__(self, label: str, min_val: int = 0, max_val: int = 100,
                  default: int = 50, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: transparent;")
 
         layout = QVBoxLayout(self)
@@ -146,10 +146,10 @@ class LabeledSlider(QWidget):
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         self._label = QLabel(label)
-        self._label.setStyleSheet("font-size: 11px; color: #334155; font-weight: 600;")
+        self._label.setStyleSheet("font-size: 11px; color: #475569; font-weight: 500;")
 
         self._value_label = QLabel(str(default))
-        self._value_label.setStyleSheet("font-size: 11px; color: #0D7C7C; font-weight: 700;")
+        self._value_label.setStyleSheet("font-size: 11px; color: #B08D3A; font-weight: 600;")
         self._value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         top.addWidget(self._label)
@@ -163,28 +163,6 @@ class LabeledSlider(QWidget):
         self._slider.setValue(default)
         self._slider.setFixedHeight(22)
         self._slider.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self._slider.setStyleSheet("""
-            QSlider::groove:horizontal {
-                height: 4px;
-                background-color: #CBD5E1;
-                border-radius: 2px;
-            }
-            QSlider::sub-page:horizontal {
-                background-color: #0D7C7C;
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background-color: #0D7C7C;
-                border: 2px solid #FFFFFF;
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
-                border-radius: 7px;
-            }
-            QSlider::handle:horizontal:hover {
-                background-color: #0A6666;
-            }
-        """)
         self._slider.valueChanged.connect(self._on_change)
         layout.addWidget(self._slider)
 
@@ -200,11 +178,11 @@ class LabeledSlider(QWidget):
 
 
 class InfoRow(QWidget):
-    """A key-value display row for inspector panels with high contrast."""
+    """A key-value display row for inspector panels with high readability."""
 
     def __init__(self, key: str, value: str = "—", parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: transparent;")
 
         layout = QHBoxLayout(self)
@@ -216,7 +194,7 @@ class InfoRow(QWidget):
         self._key_label.setMinimumWidth(85)
 
         self._value_label = QLabel(value)
-        self._value_label.setStyleSheet("font-size: 11px; color: #0F172A; font-weight: 600;")
+        self._value_label.setStyleSheet("font-size: 11px; color: #0F172A; font-weight: 500;")
         self._value_label.setWordWrap(True)
 
         layout.addWidget(self._key_label)
@@ -228,7 +206,7 @@ class InfoRow(QWidget):
     def set_mono(self):
         """Use monospace font for hashes."""
         self._value_label.setStyleSheet(
-            f"font-size: 10px; color: #0D7C7C; font-weight: 600; "
+            f"font-size: 10px; color: #0F172A; font-weight: 600; "
             f"font-family: '{Fonts.FAMILY_MONO}', '{Fonts.FALLBACK_MONO}';"
         )
 
@@ -241,7 +219,7 @@ class SectionLabel(QLabel):
         self.setStyleSheet("""
             font-size: 10px;
             font-weight: 700;
-            color: #475569;
+            color: #64748B;
             letter-spacing: 0.6px;
             padding: 4px 0px;
         """)
@@ -253,38 +231,57 @@ class Separator(QFrame):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.HLine)
-        self.setStyleSheet("background-color: #E2E8F0; max-height: 1px; margin: 4px 0px;")
+        self.setStyleSheet("background-color: #E2E8F0; max-height: 1px; margin: 4px 0px; border: none;")
 
 
 class ActionButton(QPushButton):
-    """A styled action button with crisp text contrast and states."""
+    """A styled action button with visual hierarchy: primary, gold, danger, or secondary."""
 
     def __init__(self, text: str, primary: bool = False,
-                 danger: bool = False, parent: Optional[QWidget] = None):
+                 gold: bool = False, danger: bool = False, parent: Optional[QWidget] = None):
         super().__init__(text, parent)
         self.setFixedHeight(30)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         if primary:
+            self.setProperty("primary", "true")
             self.setStyleSheet("""
                 QPushButton {
-                    background-color: #0D7C7C;
+                    background-color: #0F172A;
                     color: #FFFFFF;
-                    border: 1px solid #0B6B6B;
+                    border: 1px solid #0F172A;
                     border-radius: 4px;
                     padding: 4px 12px;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                 }
                 QPushButton:hover {
-                    background-color: #0A6666;
+                    background-color: #1E293B;
+                    border-color: #B08D3A;
                 }
                 QPushButton:pressed {
-                    background-color: #085555;
+                    background-color: #020617;
+                }
+            """)
+        elif gold:
+            self.setProperty("gold", "true")
+            self.setStyleSheet("""
+                QPushButton {
+                    background-color: #B08D3A;
+                    color: #FFFFFF;
+                    border: 1px solid #9E7B2F;
+                    border-radius: 4px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #9E7B2F;
                 }
             """)
         elif danger:
+            self.setProperty("danger", "true")
             self.setStyleSheet("""
                 QPushButton {
                     background-color: #FFFFFF;
@@ -292,15 +289,12 @@ class ActionButton(QPushButton):
                     border: 1px solid #FCA5A5;
                     border-radius: 4px;
                     padding: 4px 12px;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                 }
                 QPushButton:hover {
                     background-color: #FEF2F2;
                     border-color: #DC2626;
-                }
-                QPushButton:pressed {
-                    background-color: #FEE2E2;
                 }
             """)
         else:
@@ -311,16 +305,15 @@ class ActionButton(QPushButton):
                     border: 1px solid #CBD5E1;
                     border-radius: 4px;
                     padding: 4px 12px;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 500;
                 }
                 QPushButton:hover {
-                    background-color: #F1F5F9;
+                    background-color: #F8FAFC;
                     border-color: #94A3B8;
-                    color: #000000;
                 }
                 QPushButton:pressed {
-                    background-color: #E2E8F0;
+                    background-color: #F1F5F9;
                 }
             """)
 
@@ -333,17 +326,17 @@ class DocumentTypeCard(QFrame):
     def __init__(self, title: str, description: str, formats: str, icon_name: str, parent=None):
         super().__init__(parent)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setFixedSize(260, 160)
+        self.setFixedSize(260, 150)
         self.setStyleSheet("""
             DocumentTypeCard {
                 background-color: #FFFFFF;
-                border: 2px dashed #CBD5E1;
-                border-radius: 8px;
+                border: 1px dashed #CBD5E1;
+                border-radius: 6px;
                 padding: 12px;
             }
             DocumentTypeCard:hover {
-                background-color: #F0FDFA;
-                border: 2px solid #0D9488;
+                background-color: #FAF4E6;
+                border: 1px solid #B08D3A;
             }
         """)
 
@@ -353,19 +346,19 @@ class DocumentTypeCard(QFrame):
 
         # Icon
         icon_lbl = QLabel()
-        icon_lbl.setPixmap(get_icon(icon_name, "#0D7C7C", 36).pixmap(QSize(36, 36)))
+        icon_lbl.setPixmap(get_icon(icon_name, "#B08D3A", 32).pixmap(QSize(32, 32)))
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_lbl)
 
         # Title
         t_lbl = QLabel(title)
-        t_lbl.setStyleSheet("font-size: 14px; font-weight: 700; color: #0F172A;")
+        t_lbl.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
         t_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(t_lbl)
 
         # Description
         d_lbl = QLabel(description)
-        d_lbl.setStyleSheet("font-size: 11px; color: #475569;")
+        d_lbl.setStyleSheet("font-size: 11px; color: #64748B;")
         d_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(d_lbl)
 
@@ -373,10 +366,11 @@ class DocumentTypeCard(QFrame):
         f_lbl = QLabel(formats)
         f_lbl.setStyleSheet("""
             font-size: 10px; font-weight: 600;
-            color: #0D7C7C;
-            background-color: #E6F4F8;
+            color: #785F23;
+            background-color: #FAF4E6;
+            border: 1px solid #F5EACB;
             border-radius: 3px;
-            padding: 2px 6px;
+            padding: 2px 8px;
         """)
         f_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(f_lbl)
@@ -389,7 +383,7 @@ class DocumentTypeCard(QFrame):
 
 
 class DocumentDropZoneWidget(QWidget):
-    """Spacious dual-box dropzone showing Image Document and PDF Document options."""
+    """Spacious clean dropzone for image and PDF evidence."""
 
     open_image_clicked = pyqtSignal()
     open_pdf_clicked = pyqtSignal()
@@ -398,68 +392,69 @@ class DocumentDropZoneWidget(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setAcceptDrops(True)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("""
             DocumentDropZoneWidget {
                 background-color: #F8FAFC;
             }
             QFrame#DropArea {
                 background-color: #FFFFFF;
-                border: 1px dashed #475569;
+                border: 1px dashed #CBD5E1;
                 border-radius: 8px;
             }
             QFrame#DropArea:hover {
-                border: 2px dashed #B08D3A;
-                background-color: #FDFDF8;
+                border: 1px dashed #B08D3A;
+                background-color: #FAF4E6;
             }
         """)
 
         main_layout = QVBoxLayout(self)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setContentsMargins(30, 30, 30, 30)
 
         self.drop_area = QFrame()
         self.drop_area.setObjectName("DropArea")
-        self.drop_area.setMinimumSize(600, 350)
+        self.drop_area.setMinimumSize(520, 280)
         drop_layout = QVBoxLayout(self.drop_area)
         drop_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        drop_layout.setSpacing(20)
+        drop_layout.setSpacing(16)
 
         # Header Title
         title_box = QVBoxLayout()
-        title_box.setSpacing(8)
+        title_box.setSpacing(6)
 
-        main_title = QLabel("DROP DOCUMENT HERE")
-        main_title.setStyleSheet("font-size: 20px; font-weight: 800; color: #0F172A; letter-spacing: 1px;")
+        main_title = QLabel("OPEN EVIDENCE DOCUMENT")
+        main_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #0F172A; letter-spacing: 0.5px;")
         main_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_box.addWidget(main_title)
 
-        sub_title = QLabel("Drag & Drop an image or PDF")
-        sub_title.setStyleSheet("font-size: 13px; color: #64748B; font-weight: 500;")
+        sub_title = QLabel("Drag & drop an image or PDF, or browse files to begin examination.")
+        sub_title.setStyleSheet("font-size: 12px; color: #64748B; font-weight: 400;")
         sub_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_box.addWidget(sub_title)
 
         drop_layout.addLayout(title_box)
 
         # Browse Button
-        self.btn_browse = QPushButton("Browse")
+        self.btn_browse = QPushButton("Browse Files")
         self.btn_browse.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.btn_browse.setFixedSize(140, 36)
+        self.btn_browse.setFixedSize(140, 34)
         self.btn_browse.setStyleSheet("""
             QPushButton {
                 background-color: #0F172A;
                 color: #FFFFFF;
-                border: none;
+                border: 1px solid #0F172A;
                 border-radius: 4px;
                 font-size: 12px;
-                font-weight: 700;
+                font-weight: 600;
             }
             QPushButton:hover {
-                background-color: #B08D3A;
+                background-color: #1E293B;
+                border-color: #B08D3A;
             }
         """)
         self.btn_browse.clicked.connect(self._on_browse_clicked)
-        
+
         btn_layout = QHBoxLayout()
         btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         btn_layout.addWidget(self.btn_browse)
@@ -485,8 +480,8 @@ class DocumentDropZoneWidget(QWidget):
                     event.acceptProposedAction()
                     self.drop_area.setStyleSheet("""
                         QFrame#DropArea {
-                            border: 2px dashed #B08D3A;
-                            background-color: #FDFDF8;
+                            border: 1px dashed #B08D3A;
+                            background-color: #FAF4E6;
                             border-radius: 8px;
                         }
                     """)
@@ -497,18 +492,18 @@ class DocumentDropZoneWidget(QWidget):
         self.drop_area.setStyleSheet("""
             QFrame#DropArea {
                 background-color: #FFFFFF;
-                border: 1px dashed #475569;
+                border: 1px dashed #CBD5E1;
                 border-radius: 8px;
             }
             QFrame#DropArea:hover {
-                border: 2px dashed #B08D3A;
-                background-color: #FDFDF8;
+                border: 1px dashed #B08D3A;
+                background-color: #FAF4E6;
             }
         """)
         super().dragLeaveEvent(event)
 
     def dropEvent(self, event: QDropEvent):
-        self.dragLeaveEvent(None)  # Reset style
+        self.dragLeaveEvent(None)
         if event.mimeData().hasUrls():
             path = event.mimeData().urls()[0].toLocalFile()
             self.file_dropped.emit(path)
@@ -521,7 +516,7 @@ class EmptyStateWidget(QWidget):
     def __init__(self, title: str = "No Document Loaded",
                  message: str = "", icon_name: Optional[str] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #F8FAFC;")
 
         layout = QVBoxLayout(self)
@@ -531,21 +526,21 @@ class EmptyStateWidget(QWidget):
         if icon_name:
             icon_label = QLabel()
             icon_label.setPixmap(
-                get_icon(icon_name, "#64748B", 48).pixmap(QSize(48, 48))
+                get_icon(icon_name, "#94A3B8", 40).pixmap(QSize(40, 40))
             )
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(icon_label)
 
         title_label = QLabel(title)
         title_label.setStyleSheet(
-            "font-size: 16px; font-weight: 700; color: #0F172A;"
+            "font-size: 15px; font-weight: 700; color: #0F172A;"
         )
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
         if message:
             msg_label = QLabel(message)
-            msg_label.setStyleSheet("font-size: 12px; color: #475569;")
+            msg_label.setStyleSheet("font-size: 12px; color: #64748B;")
             msg_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             msg_label.setWordWrap(True)
             layout.addWidget(msg_label)
@@ -558,8 +553,8 @@ class EngineNotConnectedWidget(EmptyStateWidget):
         super().__init__(
             title=f"{engine_name} Engine Not Connected",
             message=(
-                "The analysis backend is not available at this stage.\n"
-                "This module will be functional when the forensic engine is integrated."
+                "The analysis backend is not active in this session.\n"
+                "This module will be fully functional when the engine is connected."
             ),
             icon_name=Icons.INFO,
             parent=parent,

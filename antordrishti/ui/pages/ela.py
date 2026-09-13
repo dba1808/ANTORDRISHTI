@@ -1,7 +1,7 @@
 """
 Antordrishti — Error Level Analysis (ELA) Page
-Functional ELA inspection with JPEG quality & scale parameters,
-disclaimer banner, and save/export capabilities.
+Professional ELA examination with synchronized view modes (Processed, Original, Split, Overlay),
+JPEG quality & scale controls, forensic disclaimer, and export capabilities.
 """
 
 from typing import Optional
@@ -25,7 +25,7 @@ import services.image_processing as ip
 
 
 class ELAPage(QWidget):
-    """Error Level Analysis page."""
+    """Error Level Analysis page with large viewer and clean controls."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +38,9 @@ class ELAPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; width: 1px; }")
+
         # ── Center: ELA Workspace ────────────────────────────
         center = QWidget()
         center_layout = QVBoxLayout(center)
@@ -46,63 +49,65 @@ class ELAPage(QWidget):
 
         # Title bar
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
-        title_bar.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
-            border-bottom: 1px solid {Colors.BORDER_LIGHT};
+        title_bar.setFixedHeight(38)
+        title_bar.setStyleSheet("""
+            background-color: #FFFFFF;
+            border-bottom: 1px solid #E2E8F0;
         """)
         tb_layout = QHBoxLayout(title_bar)
-        tb_layout.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
-        title = QLabel("Error Level Analysis (ELA)")
-        title.setProperty("heading", True)
+        tb_layout.setContentsMargins(16, 0, 16, 0)
+        title = QLabel("ELA EXAMINATION")
+        title.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A; letter-spacing: 0.5px;")
         tb_layout.addWidget(title)
         tb_layout.addStretch()
         center_layout.addWidget(title_bar)
 
-        # Main viewer
+        # Main viewer (with Processed / Original / Split / Overlay built-in)
         self.viewer = DocumentViewer()
         center_layout.addWidget(self.viewer, 1)
 
-        layout.addWidget(center, 1)
+        splitter.addWidget(center)
 
-        # ── Right: ELA Controls ──────────────────────────────
+        # ── Right: ELA Controls Panel ────────────────────────
         right_panel = QScrollArea()
         right_panel.setWidgetResizable(True)
-        right_panel.setFixedWidth(270)
+        right_panel.setFixedWidth(280)
         right_panel.setFrameShape(QFrame.Shape.NoFrame)
-        right_panel.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
-            border-left: 1px solid {Colors.BORDER};
+        right_panel.setStyleSheet("""
+            QScrollArea {
+                background-color: #FFFFFF;
+                border-left: 1px solid #E2E8F0;
+            }
         """)
 
         controls = QWidget()
-        controls.setStyleSheet("background: transparent;")
+        controls.setStyleSheet("background: #FFFFFF;")
         ctrl_layout = QVBoxLayout(controls)
-        ctrl_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        ctrl_layout.setSpacing(Spacing.MD)
+        ctrl_layout.setContentsMargins(14, 14, 14, 14)
+        ctrl_layout.setSpacing(12)
 
-        # Disclaimer banner
+        # Explanatory Forensic Note (Clean soft container)
         disclaimer = QFrame()
-        disclaimer.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Colors.INFO_LIGHT};
-                border: 1px solid #BBDEFB;
-                border-radius: 4px;
-                padding: 6px;
-            }}
+        disclaimer.setStyleSheet("""
+            QFrame {
+                background-color: #FAF4E6;
+                border: 1px solid #F5EACB;
+                border-radius: 6px;
+                padding: 4px;
+            }
         """)
         disc_layout = QVBoxLayout(disclaimer)
-        disc_layout.setContentsMargins(4, 4, 4, 4)
+        disc_layout.setContentsMargins(8, 8, 8, 8)
         disc_text = QLabel(
-            "Note: ELA highlights JPEG compression rate differences across image regions. "
-            "It is a forensic indicator and alone does not prove forgery."
+            "Forensic Note: Error Level Analysis highlights JPEG compression rate differences. "
+            "Higher error levels indicate potential resaving, splicing, or localized editing."
         )
-        disc_text.setStyleSheet(f"font-size: 10px; color: {Colors.INFO};")
+        disc_text.setStyleSheet("font-size: 10px; color: #785F23; line-height: 1.3;")
         disc_text.setWordWrap(True)
         disc_layout.addWidget(disc_text)
         ctrl_layout.addWidget(disclaimer)
 
-        ctrl_layout.addWidget(SectionLabel("ELA Settings"))
+        ctrl_layout.addWidget(SectionLabel("ELA Parameters"))
 
         self._quality = LabeledSlider("JPEG Quality", 1, 100, 75)
         ctrl_layout.addWidget(self._quality)
@@ -121,13 +126,17 @@ class ELAPage(QWidget):
         btn_reset.clicked.connect(self.reset_to_original)
         ctrl_layout.addWidget(btn_reset)
 
-        btn_save = ActionButton("Save ELA Result")
+        btn_save = ActionButton("Save Result")
         btn_save.clicked.connect(self.save_ela_result)
         ctrl_layout.addWidget(btn_save)
 
         ctrl_layout.addStretch()
         right_panel.setWidget(controls)
-        layout.addWidget(right_panel)
+        splitter.addWidget(right_panel)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 0)
+        layout.addWidget(splitter)
 
     def load_document(self, file_path: str):
         """Load a file for ELA inspection."""
@@ -150,58 +159,45 @@ class ELAPage(QWidget):
         quality = self._quality.value()
         scale = self._scale.value()
 
-        current_img = self._original_image or self.viewer.get_current_image()
-        if not current_img:
+        current_img = self.viewer.get_current_image()
+        if not current_img or current_img.isNull():
             QMessageBox.information(
-                self, "No Image Loaded", "Please open an image or PDF document first."
+                self, "No Document Loaded",
+                "Please load an image document first to generate ELA."
             )
             return
 
-        ela_bgr = None
-        if self._current_path:
-            ela_bgr = generate_ela(self._current_path, quality, scale)
+        cv_img = ip.qimage_to_cv(current_img)
+        if cv_img is None:
+            QMessageBox.warning(self, "Conversion Error", "Failed to process image buffer.")
+            return
 
-        if ela_bgr is None and current_img:
-            # Fallback to in-memory array
-            cv_img = ip.qimage_to_cv(current_img)
-            if cv_img is not None:
-                ela_bgr = generate_ela_from_array(cv_img, quality, scale)
+        ela_cv = generate_ela_from_array(cv_img, quality=quality, scale=scale)
+        if ela_cv is not None:
+            out_qimg = ip.cv_to_qimage(ela_cv)
+            if out_qimg and not out_qimg.isNull():
+                self._ela_image = out_qimg
+                self.viewer.push_processed_step(f"ELA (Q={quality}, S={scale})", out_qimg)
+                self.viewer.set_mode("processed")
+                return
 
-        if ela_bgr is not None:
-            out_qimage = ip.cv_to_qimage(ela_bgr)
-            if out_qimage:
-                self._ela_image = out_qimage
-                self.viewer.set_qimage(out_qimage, f"ELA (Q={quality}, S={scale}x)")
-        else:
-            QMessageBox.warning(
-                self, "ELA Error", "Failed to compute Error Level Analysis for this image."
-            )
+        QMessageBox.warning(self, "ELA Error", "Failed to compute Error Level Analysis.")
 
     def reset_to_original(self):
-        """Restore original image."""
-        if self._original_image:
-            self.viewer.set_qimage(self._original_image.copy(), "Original")
+        """Reset the ELA viewer back to the original source evidence."""
+        self.viewer.reset_to_original()
 
     def save_ela_result(self):
-        """Save the generated ELA image."""
-        img_to_save = self._ela_image or self.viewer.get_current_image()
-        if not img_to_save:
-            QMessageBox.information(
-                self, "No Result", "No ELA analysis image available to save."
-            )
+        """Export current ELA result image."""
+        img = self.viewer.get_current_image()
+        if not img or img.isNull():
+            QMessageBox.information(self, "Nothing to Save", "No active ELA result available to save.")
             return
 
         out_path, _ = QFileDialog.getSaveFileName(
-            self, "Save ELA Result Image", "ela_analysis.png",
+            self, "Save ELA Result Image", "ela_result.png",
             "PNG Image (*.png);;JPEG Image (*.jpg);;TIFF Image (*.tiff)"
         )
         if out_path:
-            success = img_to_save.save(out_path)
-            if success:
-                QMessageBox.information(
-                    self, "Saved", f"ELA result saved successfully:\n{out_path}"
-                )
-            else:
-                QMessageBox.critical(
-                    self, "Save Error", "Failed to save ELA result file."
-                )
+            if img.save(out_path):
+                QMessageBox.information(self, "Result Saved", f"ELA result saved successfully:\n{out_path}")

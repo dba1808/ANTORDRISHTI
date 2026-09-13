@@ -1,6 +1,6 @@
 """
 Antordrishti — Status Bar
-Bottom status bar with case, document, status, page, zoom, integrity info.
+Bottom status bar with case, evidence, document, status, page, zoom, integrity info.
 """
 
 from PyQt5.QtWidgets import QStatusBar, QLabel, QWidget, QHBoxLayout
@@ -11,15 +11,27 @@ from app.constants import AppStatus
 
 
 class ForensicStatusBar(QStatusBar):
-    """Professional forensic status bar."""
+    """Professional forensic status bar with clean light aesthetic."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setSizeGripEnabled(True)
+        self.setStyleSheet("""
+            QStatusBar {
+                background-color: #F8FAFC;
+                border-top: 1px solid #E2E8F0;
+                min-height: 28px;
+            }
+        """)
 
         # Case info
         self._case_label = self._make_label("Case: —")
         self.addWidget(self._case_label)
+        self.addWidget(self._make_separator())
+
+        # Evidence info
+        self._evidence_label = self._make_label("Evidence: —")
+        self.addWidget(self._evidence_label)
         self.addWidget(self._make_separator())
 
         # Document info
@@ -53,6 +65,9 @@ class ForensicStatusBar(QStatusBar):
 
     def set_case(self, case_id: str):
         self._case_label.setText(f"Case: {case_id}" if case_id else "Case: —")
+
+    def set_evidence(self, evidence_id: str):
+        self._evidence_label.setText(f"Evidence: {evidence_id}" if evidence_id else "Evidence: —")
 
     def set_document(self, doc_name: str):
         self._doc_label.setText(
@@ -89,17 +104,15 @@ class ForensicStatusBar(QStatusBar):
             "Invalid": Colors.ERROR,
         }.get(status, Colors.TEXT_TERTIARY)
         self._integrity_label.setStyleSheet(
-            f"font-size: 11px; color: {color}; padding: 0px 4px;"
+            f"font-size: 11px; color: {color}; font-weight: 600; padding: 0px 4px;"
         )
 
     def _make_label(self, text: str) -> QLabel:
         label = QLabel(text)
-        label.setStyleSheet(f"font-size: 11px; color: {Colors.TEXT_SECONDARY};")
+        label.setStyleSheet("font-size: 11px; color: #475569; font-weight: 500;")
         return label
 
     def _make_separator(self) -> QLabel:
         sep = QLabel("|")
-        sep.setStyleSheet(
-            f"color: {Colors.BORDER}; font-size: 11px; padding: 0 4px;"
-        )
+        sep.setStyleSheet("color: #CBD5E1; font-size: 11px; padding: 0 4px;")
         return sep

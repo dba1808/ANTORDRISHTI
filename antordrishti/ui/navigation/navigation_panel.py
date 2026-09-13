@@ -1,7 +1,7 @@
 """
 Antordrishti — Navigation Panel
-Left sidebar with pure white styling, high-contrast dark text,
-app branding, quick document access cards, and 14 navigation items.
+Left forensic sidebar with structured module groupings,
+clean typography, active gold indicators, and quick document actions.
 """
 
 from PyQt5.QtWidgets import (
@@ -22,49 +22,57 @@ class QuickAccessCard(QPushButton):
     def __init__(self, title: str, subtitle: str, icon_name: str, parent=None):
         super().__init__(parent)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setFixedHeight(48)
-        self.setIcon(get_icon(icon_name, "#0D7C7C"))
-        self.setIconSize(QSize(20, 20))
+        self.setFixedHeight(46)
+        self.setIcon(get_icon(icon_name, "#B08D3A"))
+        self.setIconSize(QSize(18, 18))
         self.setText(f" {title}\n  {subtitle}")
-        self.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #F8FAFC;
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: #FFFFFF;
                 border: 1px solid #E2E8F0;
-                border-radius: 6px;
+                border-radius: 4px;
                 text-align: left;
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: 600;
                 color: #0F172A;
-            }}
-            QPushButton:hover {{
-                background-color: #F0FDFA;
-                border: 1px solid #0D9488;
-                color: #0D7C7C;
-            }}
-            QPushButton:pressed {{
-                background-color: #CCFBF1;
-            }}
+            }
+            QPushButton:hover {
+                background-color: #FAF4E6;
+                border: 1px solid #B08D3A;
+                color: #785F23;
+            }
+            QPushButton:pressed {
+                background-color: #F5EACB;
+            }
         """)
 
 
 class NavItem(QPushButton):
-    """Single navigation item with icon, dark black text, and teal indicator on selection."""
+    """Single navigation item with icon, dark charcoal text, and gold indicator on selection."""
 
-    def __init__(self, text: str, icon_name: str, parent=None):
+    def __init__(self, page_id: str, display_text: str, icon_name: str, parent=None):
         super().__init__(parent)
-        self.setText(text)
-        # High contrast icon
-        self.setIcon(get_icon(icon_name, "#334155"))
-        self.setIconSize(QSize(18, 18))
+        self.page_id = page_id
+        self.display_text = display_text
+        self.icon_name = icon_name
+
+        self.setText(display_text)
+        self.setIcon(get_icon(icon_name, "#475569"))
+        self.setIconSize(QSize(16, 16))
         self.setCheckable(True)
         self.setFixedHeight(36)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.setStyleSheet(self._make_style())
+        self.toggled.connect(self._on_toggled)
+
+    def _on_toggled(self, checked: bool):
+        color = "#B08D3A" if checked else "#475569"
+        self.setIcon(get_icon(self.icon_name, color))
 
     def _make_style(self):
-        return f"""
-            QPushButton {{
+        return """
+            QPushButton {
                 background: transparent;
                 border: none;
                 border-left: 3px solid transparent;
@@ -72,24 +80,23 @@ class NavItem(QPushButton):
                 padding: 0 12px 0 12px;
                 font-size: 12px;
                 font-weight: 500;
-                color: #0F172A;
-            }}
-            QPushButton:hover {{
+                color: #334155;
+            }
+            QPushButton:hover {
                 background-color: #F1F5F9;
-                color: #000000;
+                color: #0F172A;
+            }
+            QPushButton:checked {
+                background-color: #FAF4E6;
+                border-left: 3px solid #B08D3A;
+                color: #0F172A;
                 font-weight: 600;
-            }}
-            QPushButton:checked {{
-                background-color: #E6F4F8;
-                border-left: 3px solid #0D7C7C;
-                color: #0D7C7C;
-                font-weight: 600;
-            }}
+            }
         """
 
 
 class NavigationPanel(QWidget):
-    """Left navigation sidebar with pure white styling and quick document access."""
+    """Left navigation sidebar organized into logical forensic groups."""
 
     page_selected = pyqtSignal(str)  # Emits NavPage.value
     add_image_clicked = pyqtSignal()
@@ -111,32 +118,31 @@ class NavigationPanel(QWidget):
 
         # ── App Branding Header ───────────────────────────────
         brand = QWidget()
-        brand.setFixedHeight(72)
+        brand.setFixedHeight(68)
         brand.setStyleSheet("""
             background-color: #FFFFFF;
             border-bottom: 1px solid #F1F5F9;
         """)
         brand_layout = QVBoxLayout(brand)
-        brand_layout.setContentsMargins(16, 8, 16, 6)
-        brand_layout.setSpacing(1)
+        brand_layout.setContentsMargins(16, 12, 16, 8)
+        brand_layout.setSpacing(2)
 
-        app_bengali = QLabel("অন্তর্দৃষ্টি | ANTORDRISHTI")
-        app_bengali.setStyleSheet("""
+        app_title = QLabel("অন্তর্দৃষ্টি | ANTORDRISHTI")
+        app_title.setStyleSheet("""
             font-size: 13px;
             font-weight: 800;
-            color: #0D7C7C;
-            letter-spacing: 1.2px;
-        """)
-        brand_layout.addWidget(app_bengali)
-
-        app_sub = QLabel("Document Forensic & Authenticity Analysis Suite")
-        app_sub.setStyleSheet("""
-            font-size: 8px;
-            color: #475569;
-            font-weight: 600;
+            color: #0F172A;
             letter-spacing: 0.8px;
         """)
-        app_sub.setWordWrap(True)
+        brand_layout.addWidget(app_title)
+
+        app_sub = QLabel("Document Forensic & Authenticity Suite")
+        app_sub.setStyleSheet("""
+            font-size: 9px;
+            color: #64748B;
+            font-weight: 500;
+            letter-spacing: 0.4px;
+        """)
         brand_layout.addWidget(app_sub)
 
         layout.addWidget(brand)
@@ -148,30 +154,29 @@ class NavigationPanel(QWidget):
             border-bottom: 1px solid #F1F5F9;
         """)
         quick_layout = QVBoxLayout(quick_sec)
-        quick_layout.setContentsMargins(12, 10, 12, 10)
+        quick_layout.setContentsMargins(12, 8, 12, 8)
         quick_layout.setSpacing(6)
 
-        sec_title = QLabel("ADD DOCUMENTS")
+        sec_title = QLabel("ADD EVIDENCE")
         sec_title.setStyleSheet("""
             font-size: 9px;
             font-weight: 700;
-            color: #64748B;
+            color: #94A3B8;
             letter-spacing: 0.8px;
         """)
         quick_layout.addWidget(sec_title)
 
-        # Dual Hover Boxes: Image & PDF
         btn_img = QuickAccessCard("Open Image", "JPG, PNG, TIFF, BMP", Icons.IMAGE_FORENSICS)
         btn_img.clicked.connect(self.add_image_clicked.emit)
         quick_layout.addWidget(btn_img)
 
-        btn_pdf = QuickAccessCard("Open PDF Document", "Multi-page Vector / Scanned", Icons.DOCUMENT)
+        btn_pdf = QuickAccessCard("Open PDF", "Multi-page Scanned / Vector", Icons.DOCUMENT)
         btn_pdf.clicked.connect(self.add_pdf_clicked.emit)
         quick_layout.addWidget(btn_pdf)
 
         layout.addWidget(quick_sec)
 
-        # ── Navigation Items List ─────────────────────────────
+        # ── Grouped Navigation Items ──────────────────────────
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -181,49 +186,62 @@ class NavigationPanel(QWidget):
         container = QWidget()
         container.setStyleSheet("background-color: #FFFFFF;")
         self._nav_layout = QVBoxLayout(container)
-        self._nav_layout.setContentsMargins(0, 6, 0, 6)
+        self._nav_layout.setContentsMargins(0, 6, 0, 10)
         self._nav_layout.setSpacing(1)
 
         self._button_group = QButtonGroup(self)
         self._button_group.setExclusive(True)
 
-        nav_items = [
-            (NavPage.DASHBOARD, Icons.DASHBOARD),
-            None,
-            (NavPage.DOCUMENT_ANALYSIS, Icons.DOCUMENT),
-            (NavPage.IMAGE_FORENSICS, Icons.IMAGE_FORENSICS),
-            (NavPage.DOCUMENT_FORENSICS, Icons.DOC_FORENSICS),
-            (NavPage.ELA, Icons.ELA),
-            (NavPage.METADATA, Icons.METADATA),
-            (NavPage.OCR, Icons.OCR),
-            (NavPage.WATERMARK, Icons.WATERMARK),
-            (NavPage.FORGERY_DETECTION, Icons.FORGERY),
-            None,
-            (NavPage.EVIDENCE_MANAGER, Icons.EVIDENCE),
-            (NavPage.EVIDENCE_FUSION, Icons.ANALYSIS),
-            (NavPage.REPORT_GENERATOR, Icons.REPORT),
-            (NavPage.BATCH_PROCESSING, Icons.BATCH),
-            None,
-            (NavPage.SETTINGS, Icons.SETTINGS),
+        groups = [
+            ("CASE", [
+                (NavPage.DASHBOARD, "Dashboard", Icons.DASHBOARD),
+                (NavPage.EVIDENCE_MANAGER, "Evidence Manager", Icons.EVIDENCE),
+            ]),
+            ("EXAMINATION", [
+                (NavPage.DOCUMENT_ANALYSIS, "Document Analysis", Icons.DOCUMENT),
+                (NavPage.IMAGE_FORENSICS, "Image Forensics", Icons.IMAGE_FORENSICS),
+                (NavPage.DOCUMENT_FORENSICS, "Document Forensics", Icons.DOC_FORENSICS),
+                (NavPage.ELA, "Error Level Analysis", Icons.ELA),
+                (NavPage.METADATA, "Metadata", Icons.METADATA),
+                (NavPage.OCR, "OCR & Text Extraction", Icons.OCR),
+                (NavPage.WATERMARK, "Watermark Detection", Icons.WATERMARK),
+                (NavPage.FORGERY_DETECTION, "Forgery Detection", Icons.FORGERY),
+            ]),
+            ("OUTPUT", [
+                (NavPage.EVIDENCE_FUSION, "Evidence Fusion", Icons.ANALYSIS),
+                (NavPage.REPORT_GENERATOR, "Report Generator", Icons.REPORT),
+                (NavPage.BATCH_PROCESSING, "Batch Processing", Icons.BATCH),
+            ]),
+            ("SYSTEM", [
+                (NavPage.SETTINGS, "Settings", Icons.SETTINGS),
+            ]),
         ]
 
         self._buttons = {}
         btn_id = 0
-        for item in nav_items:
-            if item is None:
+
+        for grp_idx, (group_name, items) in enumerate(groups):
+            if grp_idx > 0:
                 sep = QFrame()
                 sep.setFrameShape(QFrame.Shape.HLine)
-                sep.setStyleSheet(
-                    "background-color: #E2E8F0; "
-                    "max-height: 1px; margin: 4px 12px;"
-                )
+                sep.setStyleSheet("background-color: #F1F5F9; max-height: 1px; margin: 6px 12px; border: none;")
                 self._nav_layout.addWidget(sep)
-            else:
-                page, icon = item
-                btn = NavItem(page.value, icon)
+
+            lbl = QLabel(group_name)
+            lbl.setStyleSheet("""
+                font-size: 9px;
+                font-weight: 700;
+                color: #94A3B8;
+                letter-spacing: 0.8px;
+                padding: 6px 14px 2px 14px;
+            """)
+            self._nav_layout.addWidget(lbl)
+
+            for page_enum, display_text, icon_name in items:
+                btn = NavItem(page_enum.value, display_text, icon_name)
                 self._button_group.addButton(btn, btn_id)
                 self._nav_layout.addWidget(btn)
-                self._buttons[page.value] = btn
+                self._buttons[page_enum.value] = btn
                 btn_id += 1
 
         self._nav_layout.addStretch()
@@ -234,10 +252,14 @@ class NavigationPanel(QWidget):
         self._button_group.buttonClicked.connect(self._on_click)
 
         # Default selection
-        self._buttons[NavPage.DASHBOARD.value].setChecked(True)
+        if NavPage.DASHBOARD.value in self._buttons:
+            self._buttons[NavPage.DASHBOARD.value].setChecked(True)
 
     def _on_click(self, button):
-        self.page_selected.emit(button.text())
+        if hasattr(button, "page_id"):
+            self.page_selected.emit(button.page_id)
+        else:
+            self.page_selected.emit(button.text())
 
     def select_page(self, page_name: str):
         """Programmatically select a page."""

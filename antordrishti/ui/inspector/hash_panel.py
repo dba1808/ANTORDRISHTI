@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 
-from app.theme import Colors, Spacing
+from app.theme import Colors, Spacing, Bg, Border, Brand
 from ui.widgets.common import (
     CollapsibleSection, StatusIndicator, ActionButton, SectionLabel
 )
@@ -22,7 +22,7 @@ class HashPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #FFFFFF;")
 
         layout = QVBoxLayout(self)
@@ -37,17 +37,17 @@ class HashPanel(QWidget):
         sha_layout.setSpacing(4)
         self.sha256_edit = QLineEdit("—")
         self.sha256_edit.setReadOnly(True)
-        self.sha256_edit.setStyleSheet("""
-            QLineEdit {
-                background-color: #F8FAFC;
-                border: 1px solid #CBD5E1;
+        self.sha256_edit.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {Bg.INPUT};
+                border: 1px solid {Border.DEFAULT};
                 border-radius: 3px;
                 font-family: 'Consolas', monospace;
                 font-size: 10px;
-                color: #0D7C7C;
+                color: {Brand.GOLD};
                 font-weight: 600;
                 padding: 3px;
-            }
+            }}
         """)
         btn_copy_sha = QPushButton("Copy")
         btn_copy_sha.setFixedHeight(22)

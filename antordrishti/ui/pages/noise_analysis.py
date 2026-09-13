@@ -27,7 +27,7 @@ class NoiseAnalysisPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #FFFFFF;")
 
         self._current_path = ""
@@ -45,12 +45,12 @@ class NoiseAnalysisPage(QWidget):
         center_layout.setSpacing(0)
 
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
-        title_bar.setStyleSheet("background-color: #FFFFFF; border-bottom: 1px solid #E2E8F0;")
+        title_bar.setFixedHeight(48)
+        title_bar.setStyleSheet(f"background-color: #FFFFFF; border-bottom: 1px solid {Colors.BORDER_LIGHT};")
         tb = QHBoxLayout(title_bar)
-        tb.setContentsMargins(12, 0, 12, 0)
-        t = QLabel("Noise Pattern Analysis")
-        t.setStyleSheet("font-size: 13px; font-weight: 800; color: #0F172A;")
+        tb.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
+        t = QLabel("Noise Pattern & Sensor Variance Analysis")
+        t.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
         tb.addWidget(t)
         tb.addStretch()
         center_layout.addWidget(title_bar)

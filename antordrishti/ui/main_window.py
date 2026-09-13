@@ -157,9 +157,9 @@ class MainWindow(QMainWindow):
                 background-color: {Colors.PANEL};
                 color: {Colors.TEXT_PRIMARY};
                 font-weight: 600;
-                border-bottom: 2px solid #0D7C7C;
+                border-bottom: 2px solid #B08D3A;
             }}
-            QTabBar::tab:hover {{
+            QTabBar::tab:hover:!selected {{
                 background-color: {Colors.HOVER};
                 color: {Colors.TEXT_PRIMARY};
             }}
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
                 padding: 2px;
             }}
             QTabBar::close-button:hover {{
-                background-color: #FFEBEE;
+                background-color: #FEE2E2;
                 border-radius: 3px;
             }}
         """)
@@ -347,87 +347,120 @@ class MainWindow(QMainWindow):
     def _build_current_document_bar(self) -> QFrame:
         """Create the visible active evidence/document indicator."""
         bar = QFrame()
-        bar.setFixedHeight(50)
+        bar.setFixedHeight(56)
         bar.setStyleSheet("""
             QFrame {
                 background-color: #FFFFFF;
-                border-bottom: 1px solid #1F2937;
-            }
-            QLabel#ContextKicker {
-                font-size: 9px;
-                font-weight: 800;
-                color: #475569;
-                letter-spacing: 1px;
-            }
-            QLabel#ContextMain {
-                font-size: 13px;
-                font-weight: 700;
-                color: #0F172A;
-            }
-            QLabel#ContextSub {
-                font-size: 11px;
-                color: #64748B;
-            }
-            QPushButton {
-                background-color: #FFFFFF;
-                border: 1px solid #334155;
-                border-radius: 4px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: 600;
-                color: #0F172A;
-            }
-            QPushButton:hover {
-                background-color: #F8FAFC;
+                border-bottom: 1px solid #E2E8F0;
             }
         """)
 
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(14, 5, 14, 5)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 6, 16, 6)
+        layout.setSpacing(12)
 
-        text_col = QVBoxLayout()
-        text_col.setContentsMargins(0, 0, 0, 0)
-        text_col.setSpacing(1)
+        # Left Info Stack
+        info_col = QVBoxLayout()
+        info_col.setContentsMargins(0, 0, 0, 0)
+        info_col.setSpacing(2)
 
+        # Kicker row
+        kicker_row = QHBoxLayout()
+        kicker_row.setSpacing(8)
         self._context_kicker = QLabel("CURRENT EVIDENCE")
-        self._context_kicker.setObjectName("ContextKicker")
-        self._context_main = QLabel("No active document")
-        self._context_main.setObjectName("ContextMain")
-        self._context_sub = QLabel("Open an image or PDF to begin analysis.")
-        self._context_sub.setObjectName("ContextSub")
+        self._context_kicker.setStyleSheet("font-size: 9px; font-weight: 800; color: #94A3B8; letter-spacing: 0.8px;")
+        kicker_row.addWidget(self._context_kicker)
+        self._evidence_id_badge = QLabel("")
+        self._evidence_id_badge.setStyleSheet("""
+            font-size: 10px; font-weight: 700; color: #785F23;
+            background-color: #FAF4E6; border: 1px solid #F5EACB;
+            border-radius: 3px; padding: 1px 6px;
+        """)
+        self._evidence_id_badge.setVisible(False)
+        kicker_row.addWidget(self._evidence_id_badge)
+        kicker_row.addStretch()
+        info_col.addLayout(kicker_row)
 
-        text_col.addWidget(self._context_kicker)
-        text_col.addWidget(self._context_main)
-        text_col.addWidget(self._context_sub)
-        layout.addLayout(text_col, 1)
+        # Main row: Filename + Details + Integrity
+        main_row = QHBoxLayout()
+        main_row.setSpacing(10)
 
-        self._btn_context_open = QPushButton("Open")
+        self._context_main = QLabel("No document loaded")
+        self._context_main.setStyleSheet("font-size: 13px; font-weight: 700; color: #0F172A;")
+        main_row.addWidget(self._context_main)
+
+        self._doc_meta_label = QLabel("Open an image or PDF to begin examination.")
+        self._doc_meta_label.setStyleSheet("font-size: 11px; color: #64748B; font-weight: 400;")
+        main_row.addWidget(self._doc_meta_label)
+
+        self._integrity_badge = QLabel("")
+        self._integrity_badge.setStyleSheet("""
+            font-size: 10px; font-weight: 600; color: #16A34A;
+            background-color: #DCFCE7; border: 1px solid #BBF7D0;
+            border-radius: 3px; padding: 1px 6px;
+        """)
+        self._integrity_badge.setVisible(False)
+        main_row.addWidget(self._integrity_badge)
+
+        main_row.addStretch()
+        info_col.addLayout(main_row)
+
+        layout.addLayout(info_col, 1)
+
+        # Action Buttons
+        self._btn_context_open_img = QPushButton("Open Image")
+        self._btn_context_open_img.setFixedHeight(28)
+        self._btn_context_open_img.clicked.connect(self._on_import_image)
+        layout.addWidget(self._btn_context_open_img)
+
+        self._btn_context_open_pdf = QPushButton("Open PDF")
+        self._btn_context_open_pdf.setFixedHeight(28)
+        self._btn_context_open_pdf.clicked.connect(self._on_import_pdf)
+        layout.addWidget(self._btn_context_open_pdf)
+
         self._btn_context_change = QPushButton("Change Document")
-        self._btn_context_close = QPushButton("X")
-        self._btn_context_close.setToolTip("Close current document")
-        self._btn_context_close.setStyleSheet("""
+        self._btn_context_change.setFixedHeight(28)
+        self._btn_context_change.setStyleSheet("""
             QPushButton {
                 background-color: #FFFFFF;
-                border: 1px solid #94A3B8;
+                border: 1px solid #CBD5E1;
                 border-radius: 4px;
-                padding: 4px 8px;
+                padding: 4px 12px;
                 font-size: 11px;
-                font-weight: 800;
-                color: #C62828;
+                font-weight: 500;
+                color: #0F172A;
+            }
+            QPushButton:hover {
+                background-color: #F8FAFC;
+                border-color: #94A3B8;
+            }
+        """)
+        self._btn_context_change.clicked.connect(self._on_open_document)
+        self._btn_context_change.setVisible(False)
+        layout.addWidget(self._btn_context_change)
+
+        self._btn_context_close = QPushButton("×")
+        self._btn_context_close.setToolTip("Close current document")
+        self._btn_context_close.setFixedSize(28, 28)
+        self._btn_context_close.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #CBD5E1;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 700;
+                color: #64748B;
             }
             QPushButton:hover {
                 background-color: #FEE2E2;
-                border-color: #EF4444;
+                border-color: #FCA5A5;
+                color: #DC2626;
             }
         """)
-
-        self._btn_context_open.clicked.connect(self._on_open_document)
-        self._btn_context_change.clicked.connect(self._on_open_document)
         self._btn_context_close.clicked.connect(self._on_close_document)
-        layout.addWidget(self._btn_context_open)
-        layout.addWidget(self._btn_context_change)
+        self._btn_context_close.setVisible(False)
         layout.addWidget(self._btn_context_close)
+
         return bar
 
     # ── Tab Management ───────────────────────────────────────
@@ -761,20 +794,35 @@ class MainWindow(QMainWindow):
         case = context.case
 
         if not doc:
+            self._context_main.setText("No document loaded")
             case_text = f"Case {case.case_id}" if case else "No active case"
-            self._context_main.setText("No active document")
-            self._context_sub.setText(f"{case_text}. Open an image or PDF to begin analysis.")
-            self._btn_context_close.setEnabled(False)
+            self._doc_meta_label.setText(f"{case_text} — Open an image or PDF to begin examination.")
+            self._evidence_id_badge.setVisible(False)
+            self._integrity_badge.setVisible(False)
+            self._btn_context_open_img.setVisible(True)
+            self._btn_context_open_pdf.setVisible(True)
+            self._btn_context_change.setVisible(False)
+            self._btn_context_close.setVisible(False)
             return
 
-        evidence_id = evidence.evidence_id if evidence else "EVD----"
-        self._context_main.setText(f"{evidence_id}  |  {doc.file_name}")
-        self._context_sub.setText(
-            f"Case {case.case_id if case else 'Unassigned'}  |  "
-            f"{doc.file_type or 'Document'}  |  Page {doc.current_page} / {max(1, doc.page_count)}  |  "
-            f"Original Evidence  |  Integrity {doc.integrity_status}"
-        )
-        self._btn_context_close.setEnabled(True)
+        evidence_id = evidence.evidence_id if evidence else "EVD-0001"
+        self._evidence_id_badge.setText(evidence_id)
+        self._evidence_id_badge.setVisible(True)
+
+        self._context_main.setText(doc.file_name)
+        page_str = f"Page {doc.current_page} / {max(1, doc.page_count)}"
+        file_type = (doc.file_type or "Document").upper()
+        case_id = case.case_id if case else "Unassigned"
+        self._doc_meta_label.setText(f"{file_type}  •  {page_str}  •  Case {case_id}")
+
+        status = doc.integrity_status or "Verified"
+        self._integrity_badge.setText(f"✓ {status}")
+        self._integrity_badge.setVisible(True)
+
+        self._btn_context_open_img.setVisible(False)
+        self._btn_context_open_pdf.setVisible(False)
+        self._btn_context_change.setVisible(True)
+        self._btn_context_close.setVisible(True)
 
     def _on_close_document(self):
         """Close the active document while preserving the current case."""

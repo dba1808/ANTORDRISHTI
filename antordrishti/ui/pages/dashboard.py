@@ -13,63 +13,63 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QCursor
 
-from app.theme import Colors, Fonts, Spacing, Sizes
+from app.theme import Colors, Fonts, Spacing, Sizes, Bg, Text, Border, Brand
 from app.resources import get_icon, Icons
 from ui.widgets.common import SectionLabel, ActionButton, DocumentTypeCard
 
 
 class _QuickActionCard(QPushButton):
-    """Compact quick action button."""
+    """Compact quick action button with subtle workstation hover."""
 
     def __init__(self, text: str, icon_name: str, tooltip: str, parent=None):
         super().__init__(parent)
         self.setText(text)
-        self.setIcon(get_icon(icon_name, "#0D7C7C"))
-        self.setIconSize(QSize(20, 20))
+        self.setIcon(get_icon(icon_name, Brand.GOLD))
+        self.setIconSize(QSize(18, 18))
         self.setToolTip(tooltip)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedHeight(38)
-        self.setStyleSheet("""
-            QPushButton {
-                background-color: #FFFFFF;
-                border: 1px solid #E2E8F0;
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Bg.WHITE};
+                border: 1px solid {Border.DEFAULT};
                 border-radius: 6px;
                 text-align: left;
-                padding: 4px 12px;
+                padding: 4px 14px;
                 font-size: 12px;
                 font-weight: 500;
-                color: #0F172A;
-            }
-            QPushButton:hover {
-                background-color: #F0FDFA;
-                border-color: #0D9488;
-                color: #0D7C7C;
-            }
+                color: {Text.PRIMARY};
+            }}
+            QPushButton:hover {{
+                background-color: {Bg.SECONDARY};
+                border-color: {Brand.GOLD};
+                color: {Brand.GOLD};
+            }}
         """)
 
 
 class _InfoCard(QFrame):
-    """Small info card for dashboard sections."""
+    """Refined info card for dashboard workstation sections."""
 
     def __init__(self, title: str, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("""
-            _InfoCard {
-                background-color: #FFFFFF;
-                border: 1px solid #E2E8F0;
-                border-radius: 6px;
-            }
+        self.setStyleSheet(f"""
+            _InfoCard {{
+                background-color: {Bg.WHITE};
+                border: 1px solid {Border.DEFAULT};
+                border-radius: 8px;
+            }}
         """)
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(Spacing.MD, Spacing.MD,
-                                        Spacing.MD, Spacing.MD)
+        self._layout.setContentsMargins(Spacing.LG, Spacing.LG,
+                                        Spacing.LG, Spacing.LG)
         self._layout.setSpacing(Spacing.SM)
 
         title_label = QLabel(title.upper())
-        title_label.setStyleSheet("""
+        title_label.setStyleSheet(f"""
             font-size: 10px; font-weight: 700;
-            color: #64748B;
-            letter-spacing: 0.6px;
+            color: {Text.MUTED};
+            letter-spacing: 0.8px;
         """)
         self._layout.addWidget(title_label)
 
@@ -79,7 +79,7 @@ class _InfoCard(QFrame):
     def add_content_label(self, text: str, color: Optional[str] = None):
         label = QLabel(text)
         label.setStyleSheet(
-            f"font-size: 12px; color: {color or '#1E293B'}; font-weight: 500;"
+            f"font-size: 12px; color: {color or Text.PRIMARY}; font-weight: 500;"
         )
         label.setWordWrap(True)
         self._layout.addWidget(label)
@@ -102,12 +102,12 @@ class DashboardPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #FFFFFF;")
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setFrameShape(QFrame.NoFrame)
         scroll.setStyleSheet("background-color: #FFFFFF;")
 
         container = QWidget()
@@ -188,39 +188,34 @@ class DashboardPage(QWidget):
         cards_layout.setSpacing(Spacing.MD)
 
         # Current Case
-        case_card = _InfoCard("Current Case")
-        case_card.add_content_label("No active case")
-        case_card.add_content_label(
-            "Create or open a case to begin.", "#64748B"
+        self.case_card = _InfoCard("Current Case")
+        self._case_name_lbl = self.case_card.add_content_label("No active case")
+        self._case_details_lbl = self.case_card.add_content_label(
+            "Create or open a case to begin examination.", Text.MUTED
         )
-        cards_layout.addWidget(case_card)
+        cards_layout.addWidget(self.case_card)
 
         # Recent Documents (Dynamic)
         self.docs_card = _InfoCard("Recent Documents")
         self._doc_items_layout = QVBoxLayout()
-        self._doc_items_layout.setSpacing(4)
+        self._doc_items_layout.setSpacing(6)
         self.docs_card.add_widget(QWidget())  # placeholder
         self.docs_card._layout.addLayout(self._doc_items_layout)
         self._update_recent_doc_views([])
         cards_layout.addWidget(self.docs_card)
 
         # Analysis Status
-        analysis_card = _InfoCard("Analysis Status")
-        analysis_card.add_content_label("Analysis Engine Active")
-        analysis_card.add_content_label(
-            "OpenCV & PyMuPDF ready for processing.", "#0D7C7C"
+        self.analysis_card = _InfoCard("Analysis Engine Status")
+        self._analysis_title_lbl = self.analysis_card.add_content_label("Analysis Engine Active")
+        self._analysis_detail_lbl = self.analysis_card.add_content_label(
+            "OpenCV & PyMuPDF ready for processing.", Brand.GOLD
         )
-        cards_layout.addWidget(analysis_card)
+        cards_layout.addWidget(self.analysis_card)
 
         main_layout.addLayout(cards_layout)
 
-        # Recent Cases
-        recent_card = _InfoCard("Recent Cases")
-        recent_card.add_content_label("No recent cases recorded.")
-        main_layout.addWidget(recent_card)
-
         # System Status
-        sys_card = _InfoCard("System Status")
+        sys_card = _InfoCard("System Forensic Services")
 
         status_items = [
             ("Application Core", "Ready", Colors.SUCCESS),
@@ -233,7 +228,7 @@ class DashboardPage(QWidget):
         for name, status, color in status_items:
             row = QHBoxLayout()
             n_label = QLabel(name)
-            n_label.setStyleSheet("font-size: 11px; color: #1E293B; font-weight: 500;")
+            n_label.setStyleSheet(f"font-size: 11px; color: {Text.PRIMARY}; font-weight: 500;")
             s_label = QLabel(f"●  {status}")
             s_label.setStyleSheet(f"font-size: 11px; color: {color}; font-weight: 600;")
             row.addWidget(n_label)
@@ -249,6 +244,21 @@ class DashboardPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(scroll)
+
+    def set_current_context(self, context):
+        """Update dashboard display when active case or evidence changes."""
+        if context and context.case:
+            case_title = context.case.case_name or "Untitled Case"
+            case_num = context.case.case_number or "—"
+            examiner = context.case.examiner_name or "Unknown Examiner"
+            self._case_name_lbl.setText(f"{case_title} ({case_num})")
+            self._case_details_lbl.setText(f"Examiner: {examiner}")
+        else:
+            self._case_name_lbl.setText("No active case")
+            self._case_details_lbl.setText("Create or open a case to begin examination.")
+
+        if context and context.document:
+            self.add_recent_document(context.document.file_path)
 
     def add_recent_document(self, path: str):
         if not hasattr(self, "_recent_paths"):
@@ -266,27 +276,29 @@ class DashboardPage(QWidget):
 
         if not paths:
             lbl = QLabel("No recent documents")
-            lbl.setStyleSheet("font-size: 11px; color: #64748B;")
+            lbl.setStyleSheet(f"font-size: 11px; color: {Text.MUTED};")
             self._doc_items_layout.addWidget(lbl)
         else:
             for p in paths:
-                btn = QPushButton(f"📄 {os.path.basename(p)}")
+                btn = QPushButton(f"📄  {os.path.basename(p)}")
                 btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
                 btn.setToolTip(p)
-                btn.setStyleSheet("""
-                    QPushButton {
-                        background: transparent;
-                        border: none;
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background: {Bg.SECONDARY};
+                        border: 1px solid {Border.DEFAULT};
+                        border-radius: 4px;
                         text-align: left;
                         font-size: 11px;
-                        color: #0D7C7C;
-                        font-weight: 600;
-                        padding: 2px 0px;
-                    }
-                    QPushButton:hover {
-                        color: #0F172A;
-                        text-decoration: underline;
-                    }
+                        color: {Text.PRIMARY};
+                        font-weight: 500;
+                        padding: 4px 8px;
+                    }}
+                    QPushButton:hover {{
+                        border-color: {Brand.GOLD};
+                        color: {Brand.GOLD};
+                        background: {Bg.WHITE};
+                    }}
                 """)
                 btn.clicked.connect(lambda _, path_to_open=p: self.document_selected.emit(path_to_open))
                 self._doc_items_layout.addWidget(btn)

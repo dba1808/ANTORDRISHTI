@@ -10,7 +10,7 @@ from services.file_service import (
     is_supported_pdf,
     is_supported_document,
 )
-from services.hash_service import calculate_hashes, verify_hash
+from services.hash_service import calculate_hashes, calculate_sha256, calculate_md5, verify_hash
 from services.document_service import load_document, render_page_image
 from services.db_service import get_db, DatabaseService
 
@@ -21,6 +21,8 @@ __all__ = [
     "is_supported_pdf",
     "is_supported_document",
     "calculate_hashes",
+    "calculate_sha256",
+    "calculate_md5",
     "verify_hash",
     "load_document",
     "render_page_image",

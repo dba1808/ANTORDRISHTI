@@ -24,25 +24,25 @@ class WatermarkPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Title
+        # Title Bar
         title_bar = QWidget()
-        title_bar.setFixedHeight(36)
+        title_bar.setFixedHeight(48)
         title_bar.setStyleSheet(f"""
-            background-color: {Colors.PANEL};
+            background-color: {Colors.CANVAS};
             border-bottom: 1px solid {Colors.BORDER_LIGHT};
         """)
         tb_layout = QHBoxLayout(title_bar)
-        tb_layout.setContentsMargins(Spacing.MD, 0, Spacing.MD, 0)
-        title = QLabel("Watermark Detection")
-        title.setProperty("heading", True)
+        tb_layout.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
+        title = QLabel("Forensic Watermark & Steganography Examination")
+        title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
         tb_layout.addWidget(title)
         tb_layout.addStretch()
         layout.addWidget(title_bar)
 
         # Content
         content = QHBoxLayout()
-        content.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        content.setSpacing(Spacing.MD)
+        content.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        content.setSpacing(Spacing.LG)
 
         # Center: Visualization
         center = EngineNotConnectedWidget("Watermark Detection")
@@ -53,14 +53,14 @@ class WatermarkPage(QWidget):
         right.setFixedWidth(260)
         right.setStyleSheet(f"""
             QFrame {{
-                background-color: {Colors.PANEL};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
+                background-color: {Colors.CANVAS};
+                border: 1px solid {Colors.BORDER_LIGHT};
+                border-radius: 8px;
             }}
         """)
         r_layout = QVBoxLayout(right)
-        r_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        r_layout.setSpacing(Spacing.SM)
+        r_layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
+        r_layout.setSpacing(Spacing.MD)
 
         # Watermark Type
         r_layout.addWidget(SectionLabel("Watermark Type"))

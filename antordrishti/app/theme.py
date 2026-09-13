@@ -1,68 +1,75 @@
 """
 Antordrishti Theme Configuration
 Centralized color palette, font configuration, and spacing constants.
+Light / White Forensic Workstation Aesthetic with Restrained Gold Accents.
 """
 
 
 class Colors:
-    """Application color palette — professional light theme."""
+    """Application color palette — professional light forensic theme."""
 
     # Backgrounds
-    BACKGROUND = "#F5F6F8"
+    BACKGROUND = "#F8FAFC"
+    CANVAS = "#F8FAFC"
     PANEL = "#FFFFFF"
-    PANEL_ALT = "#FAFBFC"
-    CANVAS = "#FFFFFF"
-    HOVER = "#EDF0F4"
-    SELECTED = "#E3EBF3"
-    PRESSED = "#D6DEE8"
+    PANEL_ALT = "#F1F5F9"
+    HOVER = "#F1F5F9"
+    SELECTED = "#FAF4E6"
+    PRESSED = "#F5EACB"
 
-    # Borders
-    BORDER = "#D9DDE3"
-    BORDER_LIGHT = "#E8EAED"
-    BORDER_DARK = "#BFC4CC"
-    SEPARATOR = "#E0E3E8"
+    # Borders & Separators (Subtle & clean, eliminating harsh 2px black boxes)
+    BORDER = "#E2E8F0"
+    BORDER_LIGHT = "#F1F5F9"
+    BORDER_DARK = "#CBD5E1"
+    BORDER_FOCUS = "#B08D3A"
+    SEPARATOR = "#E2E8F0"
 
-    # Text
-    TEXT_PRIMARY = "#202124"
-    TEXT_SECONDARY = "#5F6368"
-    TEXT_TERTIARY = "#80868B"
-    TEXT_DISABLED = "#B0B5BD"
+    # Text (Dark Charcoal hierarchy)
+    TEXT_PRIMARY = "#0F172A"
+    TEXT_SECONDARY = "#475569"
+    TEXT_TERTIARY = "#94A3B8"
+    TEXT_DISABLED = "#CBD5E1"
     TEXT_INVERSE = "#FFFFFF"
 
-    # Accent
-    ACCENT = "#1A73B5"
-    ACCENT_HOVER = "#155E96"
-    ACCENT_LIGHT = "#E8F0F8"
-    ACCENT_TEAL = "#0D7C7C"
-    ACCENT_TEAL_LIGHT = "#E6F4F4"
+    # Restrained Forensic Gold Accent System
+    ACCENT = "#B08D3A"
+    ACCENT_GOLD = "#B08D3A"
+    ACCENT_HOVER = "#9E7B2F"
+    ACCENT_LIGHT = "#FAF4E6"
+    ACCENT_SUBTLE = "#F5EACB"
+    ACCENT_DARK = "#785F23"
 
     # Navigation
-    NAV_INDICATOR = "#0D8A8A"
-    NAV_SELECTED_BG = "#EFF8F8"
+    NAV_INDICATOR = "#B08D3A"
+    NAV_SELECTED_BG = "#FAF4E6"
 
-    # Status
-    SUCCESS = "#2E7D32"
-    SUCCESS_LIGHT = "#E8F5E9"
-    WARNING = "#E65100"
-    WARNING_LIGHT = "#FFF3E0"
-    ERROR = "#C62828"
-    ERROR_LIGHT = "#FFEBEE"
-    INFO = "#1565C0"
-    INFO_LIGHT = "#E3F2FD"
+    # Status Indicators (Forensic Precision)
+    SUCCESS = "#16A34A"
+    SUCCESS_LIGHT = "#DCFCE7"
+    WARNING = "#D97706"
+    WARNING_LIGHT = "#FEF3C7"
+    ERROR = "#DC2626"
+    ERROR_LIGHT = "#FEE2E2"
+    INFO = "#2563EB"
+    INFO_LIGHT = "#EFF6FF"
 
     # Evidence States
-    EVIDENCE_ORIGINAL = "#1565C0"
-    EVIDENCE_WORKING = "#E65100"
-    EVIDENCE_FINDING = "#C62828"
-    EVIDENCE_VERIFIED = "#2E7D32"
+    EVIDENCE_ORIGINAL = "#2563EB"
+    EVIDENCE_WORKING = "#D97706"
+    EVIDENCE_FINDING = "#DC2626"
+    EVIDENCE_VERIFIED = "#16A34A"
 
-    # Toolbar
+    # Toolbar & Menus
     TOOLBAR_BG = "#FFFFFF"
-    TOOLBAR_BORDER = "#E0E3E8"
+    TOOLBAR_BORDER = "#E2E8F0"
 
     # Status Bar
-    STATUSBAR_BG = "#F0F1F3"
-    STATUSBAR_BORDER = "#D9DDE3"
+    STATUSBAR_BG = "#F8FAFC"
+    STATUSBAR_BORDER = "#E2E8F0"
+
+    # Backward compatibility aliases
+    ACCENT_TEAL = "#B08D3A"
+    ACCENT_TEAL_LIGHT = "#FAF4E6"
 
 
 class Fonts:
@@ -74,7 +81,7 @@ class Fonts:
     FALLBACK_MONO = "Courier New"
 
     # Sizes (px)
-    SIZE_TITLE = 17
+    SIZE_TITLE = 18
     SIZE_HEADING = 14
     SIZE_SUBHEADING = 13
     SIZE_BODY = 12
@@ -101,8 +108,8 @@ class Spacing:
     XXXL = 32
 
     # Specific contexts
-    PANEL_PADDING = 16
-    SECTION_GAP = 20
+    PANEL_PADDING = 14
+    SECTION_GAP = 16
     WIDGET_GAP = 8
     TOOLBAR_PADDING = 4
     STATUS_PADDING = 6
@@ -113,21 +120,21 @@ class Sizes:
 
     # Icons
     ICON_SM = 16
-    ICON_MD = 20
-    ICON_LG = 24
-    ICON_XL = 32
+    ICON_MD = 18
+    ICON_LG = 22
+    ICON_XL = 28
 
     # Toolbar
-    TOOLBAR_HEIGHT = 40
-    TOOLBAR_ICON = 20
+    TOOLBAR_HEIGHT = 42
+    TOOLBAR_ICON = 18
 
     # Navigation
-    NAV_WIDTH = 220
-    NAV_ITEM_HEIGHT = 36
+    NAV_WIDTH = 230
+    NAV_ITEM_HEIGHT = 38
     NAV_INDICATOR_WIDTH = 3
 
     # Inspector
-    INSPECTOR_WIDTH = 280
+    INSPECTOR_WIDTH = 260
 
     # Buttons
     BUTTON_HEIGHT = 30
@@ -135,11 +142,45 @@ class Sizes:
     BUTTON_RADIUS = 4
 
     # Inputs
-    INPUT_HEIGHT = 28
-    COMBO_HEIGHT = 28
+    INPUT_HEIGHT = 30
+    COMBO_HEIGHT = 30
 
     # Scrollbar
     SCROLLBAR_WIDTH = 8
 
     # Status bar
-    STATUSBAR_HEIGHT = 26
+    STATUSBAR_HEIGHT = 28
+
+
+class Bg:
+    WHITE = "#FFFFFF"
+    PRIMARY = "#F8FAFC"
+    SECONDARY = "#F1F5F9"
+    INPUT = "#FFFFFF"
+    CARD = "#FFFFFF"
+    HOVER = "#F1F5F9"
+    SELECTED = "#FAF4E6"
+
+
+class Border:
+    DEFAULT = "#E2E8F0"
+    SUBTLE = "#F1F5F9"
+    LIGHT = "#F1F5F9"
+    DARK = "#CBD5E1"
+    FOCUS = "#B08D3A"
+    HOVER = "#B08D3A"
+
+
+class Text:
+    PRIMARY = "#0F172A"
+    SECONDARY = "#475569"
+    MUTED = "#94A3B8"
+    TERTIARY = "#94A3B8"
+    INVERSE = "#FFFFFF"
+
+
+class Brand:
+    GOLD = "#B08D3A"
+    GOLD_LIGHT = "#FAF4E6"
+    GOLD_HOVER = "#9E7B2F"
+    GOLD_DARK = "#785F23"

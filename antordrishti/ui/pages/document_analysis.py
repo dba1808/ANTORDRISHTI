@@ -1,10 +1,11 @@
 """
 Antordrishti — Document Analysis Workspace
 Primary forensic workspace integrating:
-- Full categorized OpenCV tool panels (Enhancement, Blur/Noise, Threshold/Edges, Color/Channels)
-- Dynamic Histogram analyzer with channel switcher and image export
+- Large Document Viewer with synchronized Split View & Overlay comparisons
+- Prominent Histogram analyzer with live statistics (Mean, Std, Min, Max) and export
+- Structured Image Information soft container
+- Categorized OpenCV tool panels (Enhancement, Blur/Noise, Threshold/Edges, Color/Channels)
 - Analysis History stack with Undo, Redo, and Reset
-- Document viewer with Split View & Overlay comparisons
 """
 
 from typing import Optional, List
@@ -14,7 +15,7 @@ from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QTabWidget,
     QLabel, QPushButton, QSlider, QSpinBox, QScrollArea, QFrame,
     QMessageBox, QInputDialog, QComboBox, QFileDialog, QListWidget,
-    QListWidgetItem
+    QListWidgetItem, QGridLayout
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QImage, QPixmap, QCursor
@@ -23,8 +24,7 @@ from app.theme import Colors, Spacing, Sizes
 from app.resources import get_icon, Icons
 from ui.viewer.document_viewer import DocumentViewer
 from ui.viewer.viewer_toolbar import ViewerToolbar
-from ui.viewer.layers_panel import LayersPanel
-from ui.widgets.common import SectionLabel, ActionButton, LabeledSlider, Separator
+from ui.widgets.common import SectionLabel, ActionButton, LabeledSlider, Separator, InfoRow
 
 import services.image_processing as ip
 
@@ -41,7 +41,7 @@ class ForensicToolsPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #FFFFFF;")
 
         layout = QVBoxLayout(self)
@@ -52,38 +52,144 @@ class ForensicToolsPanel(QWidget):
         self.tabs = QTabWidget()
         self.tabs.setStyleSheet("""
             QTabWidget::pane {
-                border: 1px solid #E2E8F0;
+                border: none;
                 background-color: #FFFFFF;
             }
             QTabBar::tab {
                 background-color: #F8FAFC;
                 border: 1px solid #E2E8F0;
                 border-bottom: none;
-                padding: 6px 10px;
+                padding: 6px 12px;
                 font-size: 11px;
                 font-weight: 600;
                 color: #475569;
             }
             QTabBar::tab:selected {
                 background-color: #FFFFFF;
-                color: #0D7C7C;
-                border-bottom: 2px solid #0D7C7C;
+                color: #0F172A;
+                border-bottom: 2px solid #B08D3A;
             }
         """)
 
-        # Tab 1: OpenCV Tools (Enhancement, Blur, Edges, Channels)
+        # Tab 1: Histogram & Image Information (Prominent as per Requirement 13)
+        self.hist_tab = self._build_histogram_tab()
+        self.tabs.addTab(self.hist_tab, "Histogram & Info")
+
+        # Tab 2: OpenCV Tools (Enhancement, Blur, Edges, Channels)
         self.tools_tab = self._build_tools_tab()
         self.tabs.addTab(self.tools_tab, "OpenCV Tools")
 
-        # Tab 2: Histogram Tool
-        self.hist_tab = self._build_histogram_tab()
-        self.tabs.addTab(self.hist_tab, "Histogram")
-
-        # Tab 3: History & Undo/Redo
+        # Tab 3: History & Actions
         self.history_tab = self._build_history_tab()
         self.tabs.addTab(self.history_tab, "History")
 
         layout.addWidget(self.tabs, 1)
+
+    def _build_histogram_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("background-color: #FFFFFF;")
+
+        container = QWidget()
+        container.setStyleSheet("background-color: #FFFFFF;")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setSpacing(10)
+
+        # ── 1. Image Information Soft Container ──
+        layout.addWidget(SectionLabel("Image Information"))
+        info_box = QFrame()
+        info_box.setStyleSheet("""
+            QFrame {
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 4px;
+            }
+        """)
+        info_layout = QVBoxLayout(info_box)
+        info_layout.setContentsMargins(8, 6, 8, 6)
+        info_layout.setSpacing(4)
+
+        self.info_resolution = InfoRow("Resolution", "—")
+        self.info_colorspace = InfoRow("Color Space", "—")
+        self.info_filetype = InfoRow("File Type", "—")
+        self.info_filesize = InfoRow("File Size", "—")
+        self.info_pages = InfoRow("Pages", "1")
+
+        info_layout.addWidget(self.info_resolution)
+        info_layout.addWidget(self.info_colorspace)
+        info_layout.addWidget(self.info_filetype)
+        info_layout.addWidget(self.info_filesize)
+        info_layout.addWidget(self.info_pages)
+        layout.addWidget(info_box)
+
+        layout.addWidget(Separator())
+
+        # ── 2. Prominent Histogram ──
+        layout.addWidget(SectionLabel("Histogram Analyzer"))
+
+        self.hist_combo = QComboBox()
+        self.hist_combo.addItems(["RGB Overlay", "Red Channel", "Green Channel", "Blue Channel", "Grayscale"])
+        self.hist_combo.currentIndexChanged.connect(self._on_hist_channel_changed)
+        layout.addWidget(self.hist_combo)
+
+        # Large clean histogram chart display
+        self.hist_chart_label = QLabel("Histogram will display when document is loaded.")
+        self.hist_chart_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hist_chart_label.setStyleSheet("""
+            QLabel {
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                color: #64748B;
+                font-size: 11px;
+            }
+        """)
+        self.hist_chart_label.setFixedHeight(230)
+        layout.addWidget(self.hist_chart_label)
+
+        # ── 3. Histogram Statistics ──
+        layout.addWidget(SectionLabel("Statistics"))
+        stats_box = QFrame()
+        stats_box.setStyleSheet("""
+            QFrame {
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 4px;
+            }
+        """)
+        stats_grid = QGridLayout(stats_box)
+        stats_grid.setContentsMargins(8, 6, 8, 6)
+        stats_grid.setSpacing(6)
+
+        self.stat_mean = InfoRow("Mean", "—")
+        self.stat_std = InfoRow("Std Dev", "—")
+        self.stat_min = InfoRow("Min", "—")
+        self.stat_max = InfoRow("Max", "—")
+
+        stats_grid.addWidget(self.stat_mean, 0, 0)
+        stats_grid.addWidget(self.stat_std, 0, 1)
+        stats_grid.addWidget(self.stat_min, 1, 0)
+        stats_grid.addWidget(self.stat_max, 1, 1)
+        layout.addWidget(stats_box)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
+        btn_refresh_hist = ActionButton("Refresh")
+        btn_refresh_hist.clicked.connect(self._refresh_hist_chart)
+        btn_export_hist = ActionButton("Export Plot", primary=True)
+        btn_export_hist.clicked.connect(self.export_histogram_requested.emit)
+        btn_row.addWidget(btn_refresh_hist)
+        btn_row.addWidget(btn_export_hist)
+        layout.addLayout(btn_row)
+
+        layout.addStretch()
+        scroll.setWidget(container)
+        return scroll
 
     def _build_tools_tab(self) -> QWidget:
         scroll = QScrollArea()
@@ -95,7 +201,7 @@ class ForensicToolsPanel(QWidget):
         container = QWidget()
         container.setStyleSheet("background-color: #FFFFFF;")
         c_layout = QVBoxLayout(container)
-        c_layout.setContentsMargins(10, 10, 10, 10)
+        c_layout.setContentsMargins(12, 10, 12, 12)
         c_layout.setSpacing(8)
 
         # ── 1. Enhancement ──
@@ -211,43 +317,11 @@ class ForensicToolsPanel(QWidget):
         scroll.setWidget(container)
         return scroll
 
-    def _build_histogram_tab(self) -> QWidget:
-        w = QWidget()
-        w.setStyleSheet("background-color: #FFFFFF;")
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
-
-        layout.addWidget(SectionLabel("Histogram Channel"))
-
-        self.hist_combo = QComboBox()
-        self.hist_combo.addItems(["RGB Overlay", "Red Channel", "Green Channel", "Blue Channel", "Grayscale"])
-        self.hist_combo.currentIndexChanged.connect(self._on_hist_channel_changed)
-        layout.addWidget(self.hist_combo)
-
-        # Histogram Chart Display Label
-        self.hist_chart_label = QLabel()
-        self.hist_chart_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.hist_chart_label.setStyleSheet("background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px;")
-        self.hist_chart_label.setFixedHeight(220)
-        layout.addWidget(self.hist_chart_label)
-
-        btn_export_hist = ActionButton("Export Histogram Image...", primary=True)
-        btn_export_hist.clicked.connect(self.export_histogram_requested.emit)
-        layout.addWidget(btn_export_hist)
-
-        btn_refresh_hist = ActionButton("Refresh Histogram")
-        btn_refresh_hist.clicked.connect(self._refresh_hist_chart)
-        layout.addWidget(btn_refresh_hist)
-
-        layout.addStretch()
-        return w
-
     def _build_history_tab(self) -> QWidget:
         w = QWidget()
         w.setStyleSheet("background-color: #FFFFFF;")
         layout = QVBoxLayout(w)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(12, 10, 12, 12)
         layout.setSpacing(8)
 
         layout.addWidget(SectionLabel("Analysis History"))
@@ -266,8 +340,8 @@ class ForensicToolsPanel(QWidget):
                 color: #0F172A;
             }
             QListWidget::item:selected {
-                background-color: #E6F4F8;
-                color: #0D7C7C;
+                background-color: #FAF4E6;
+                color: #785F23;
                 font-weight: 700;
             }
         """)
@@ -307,12 +381,26 @@ class ForensicToolsPanel(QWidget):
             if qimg:
                 pix = QPixmap.fromImage(qimg)
                 self.hist_chart_label.setPixmap(pix.scaled(
-                    self.hist_chart_label.width() - 10, 200,
+                    max(200, self.hist_chart_label.width() - 10), 220,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 ))
         else:
             self.hist_chart_label.clear()
+            self.hist_chart_label.setText("No active histogram.")
+
+    def set_statistics(self, mean_val: str, std_val: str, min_val: str, max_val: str):
+        self.stat_mean.set_value(mean_val)
+        self.stat_std.set_value(std_val)
+        self.stat_min.set_value(min_val)
+        self.stat_max.set_value(max_val)
+
+    def set_image_info(self, resolution: str, colorspace: str, filetype: str, filesize: str, pages: str = "1"):
+        self.info_resolution.set_value(resolution)
+        self.info_colorspace.set_value(colorspace)
+        self.info_filetype.set_value(filetype)
+        self.info_filesize.set_value(filesize)
+        self.info_pages.set_value(pages)
 
     def _on_hist_channel_changed(self):
         self.apply_operation.emit("update_hist", {})
@@ -322,13 +410,13 @@ class ForensicToolsPanel(QWidget):
 
 
 class DocumentAnalysisPage(QWidget):
-    """Primary document analysis workspace."""
+    """Primary document analysis workspace with prominent viewer and histogram."""
 
     save_processed_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # type: ignore[arg-type]
         self.setStyleSheet("background-color: #FFFFFF;")
 
         self._current_context = None
@@ -344,13 +432,14 @@ class DocumentAnalysisPage(QWidget):
 
         # Splitter between central DocumentViewer and right ForensicToolsPanel
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setStyleSheet("QSplitter::handle { background-color: #E2E8F0; width: 1px; }")
 
         # Main Document Viewer with Filmstrip & Comparisons
         self.document_viewer = DocumentViewer()
         self.document_viewer.history_updated.connect(self._on_history_updated)
         splitter.addWidget(self.document_viewer)
 
-        # Right Tools Panel (OpenCV Tools, Histogram, History, Layers)
+        # Right Tools Panel (Histogram, Info, OpenCV Tools, History)
         self.tools_panel = ForensicToolsPanel()
         self.tools_panel.apply_operation.connect(self._execute_operation)
         self.tools_panel.export_histogram_requested.connect(self._export_histogram)
@@ -360,9 +449,9 @@ class DocumentAnalysisPage(QWidget):
         self.tools_panel.save_requested.connect(self.save_processed_requested.emit)
 
         splitter.addWidget(self.tools_panel)
-        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(0, 1)  # document viewer gets maximum space
         splitter.setStretchFactor(1, 0)
-        splitter.setSizes([850, 280])
+        splitter.setSizes([850, 320])
 
         layout.addWidget(splitter, 1)
 
@@ -371,6 +460,15 @@ class DocumentAnalysisPage(QWidget):
     def set_current_context(self, context):
         """Receive the global current case/evidence/document context."""
         self._current_context = context
+        if context and context.document:
+            doc = context.document
+            self.tools_panel.set_image_info(
+                resolution=doc.resolution or "—",
+                colorspace=doc.color_space or "RGB",
+                filetype=(doc.file_type or "JPEG").upper(),
+                filesize=f"{doc.file_size:,} bytes" if doc.file_size else "—",
+                pages=str(max(1, doc.page_count))
+            )
 
     def clear_workspace(self):
         """Completely clear the viewer and reset tools."""
@@ -378,6 +476,8 @@ class DocumentAnalysisPage(QWidget):
         self.document_viewer.clear()
         self.tools_panel.update_history_list([], -1)
         self.tools_panel.set_histogram_image(None)
+        self.tools_panel.set_statistics("—", "—", "—", "—")
+        self.tools_panel.set_image_info("—", "—", "—", "—", "1")
 
     def _on_history_updated(self, steps: List[str], current_idx: int):
         self.tools_panel.update_history_list(steps, current_idx)
@@ -477,38 +577,26 @@ class DocumentAnalysisPage(QWidget):
                 out_qimg = ip.cv_to_qimage(res_cv)
                 if out_qimg:
                     self.document_viewer.push_processed_step(label, out_qimg)
-                    
+
+                    # Update info & histogram
+                    h, w = res_cv.shape[:2]
+                    colorspace = "RGB" if len(res_cv.shape) > 2 else "Grayscale"
+                    self.tools_panel.info_resolution.set_value(f"{w} × {h}")
+                    self.tools_panel.info_colorspace.set_value(colorspace)
+
                     # Log event if context exists
                     if getattr(self, "_current_context", None) and self._current_context.case and self._current_context.evidence:
                         try:
                             from services.db_service import get_db
                             db = get_db()
-                            
-                            # Log processing history
                             db.add_processing_history(
                                 self._current_context.case.case_id,
                                 self._current_context.evidence.evidence_id,
                                 label,
                                 params
                             )
-                            
-                            # Log case event
-                            db._conn.execute(
-                                """INSERT INTO case_events
-                                   (case_id, evidence_id, event_type, description, timestamp)
-                                   VALUES (?, ?, ?, ?, ?)""",
-                                (
-                                    self._current_context.case.case_id,
-                                    self._current_context.evidence.evidence_id,
-                                    "Image Processing",
-                                    f"Applied {label} filter",
-                                    __import__('datetime').datetime.now().isoformat()
-                                )
-                            )
-                            db._conn.commit()
                         except Exception as e:
-                            import logging
-                            logging.getLogger("antordrishti").warning(f"Could not log analysis step: {e}")
+                            pass
 
         except Exception as e:
             QMessageBox.critical(self, "Processing Error", f"Operation failed: {str(e)}")
@@ -523,6 +611,19 @@ class DocumentAnalysisPage(QWidget):
                 mode = mode_map.get(mode_idx, "all")
                 self._last_hist_image = ip.compute_histogram(cv_img, mode=mode)
                 self.tools_panel.set_histogram_image(self._last_hist_image)
+
+                # Compute statistics
+                mean_v = f"{float(np.mean(cv_img)):.1f}"
+                std_v = f"{float(np.std(cv_img)):.1f}"
+                min_v = f"{int(np.min(cv_img))}"
+                max_v = f"{int(np.max(cv_img))}"
+                self.tools_panel.set_statistics(mean_v, std_v, min_v, max_v)
+
+                # Update resolution info if not set
+                h, w = cv_img.shape[:2]
+                cs = "RGB" if len(cv_img.shape) > 2 else "Grayscale"
+                self.tools_panel.info_resolution.set_value(f"{w} × {h}")
+                self.tools_panel.info_colorspace.set_value(cs)
 
     def _export_histogram(self):
         if self._last_hist_image is None:
