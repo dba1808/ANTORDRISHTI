@@ -138,6 +138,17 @@ class ELAPage(QWidget):
         splitter.setStretchFactor(1, 0)
         layout.addWidget(splitter)
 
+    def set_current_context(self, context):
+        """Update ELA workspace from active document context."""
+        doc = context.document if context else None
+        if doc and doc.file_path and doc.file_path != self._current_path:
+            self.load_document(doc.file_path)
+        elif not doc or not doc.file_path:
+            self._current_path = ""
+            self._original_image = None
+            self._ela_image = None
+            self.viewer.clear()
+
     def load_document(self, file_path: str):
         """Load a file for ELA inspection."""
         self._current_path = file_path

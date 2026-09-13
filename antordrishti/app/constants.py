@@ -91,6 +91,7 @@ class NavPage(Enum):
     OCR = "OCR & Text Extraction"
     WATERMARK = "Watermark Detection"
     FORGERY_DETECTION = "Forgery Detection"
+    HISTOGRAM = "Histogram Analysis"
     NOISE_ANALYSIS = "Noise Analysis"
     EVIDENCE_MANAGER = "Evidence Manager"
     EVIDENCE_FUSION = "Evidence Fusion"

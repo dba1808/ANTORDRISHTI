@@ -248,11 +248,12 @@ class DashboardPage(QWidget):
     def set_current_context(self, context):
         """Update dashboard display when active case or evidence changes."""
         if context and context.case:
-            case_title = context.case.case_name or "Untitled Case"
-            case_num = context.case.case_number or "—"
-            examiner = context.case.examiner_name or "Unknown Examiner"
+            case_title = context.case.case_name or context.case.title or "Untitled Case"
+            case_num = context.case.case_id or context.case.case_number or "—"
+            examiner = context.case.examiner_name or context.case.examiner or "Unknown Examiner"
+            status = getattr(context.case, "status", "OPEN")
             self._case_name_lbl.setText(f"{case_title} ({case_num})")
-            self._case_details_lbl.setText(f"Examiner: {examiner}")
+            self._case_details_lbl.setText(f"Examiner: {examiner}  •  Status: {status}")
         else:
             self._case_name_lbl.setText("No active case")
             self._case_details_lbl.setText("Create or open a case to begin examination.")

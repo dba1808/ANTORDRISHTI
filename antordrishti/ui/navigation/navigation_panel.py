@@ -206,6 +206,7 @@ class NavigationPanel(QWidget):
                 (NavPage.OCR, "OCR & Text Extraction", Icons.OCR),
                 (NavPage.WATERMARK, "Watermark Detection", Icons.WATERMARK),
                 (NavPage.FORGERY_DETECTION, "Forgery Detection", Icons.FORGERY),
+                (NavPage.HISTOGRAM, "Histogram Analysis", Icons.ANALYSIS),
             ]),
             ("OUTPUT", [
                 (NavPage.EVIDENCE_FUSION, "Evidence Fusion", Icons.ANALYSIS),
