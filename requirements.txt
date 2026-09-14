@@ -38,3 +38,7 @@ torchvision>=0.16.0       # Vision models and preprocessing transforms
 # ── Typing & Development Tools ───────────────────────────────
 typing_extensions>=4.8.0
 mypy>=1.8.0
+
+# ── Scanner Integration ──────────────────────────────────────
+pywin32>=306                # WIA (Windows Image Acquisition) COM interface
+requests>=2.31.0            # HTTP client for IP scanner (eSCL/AirScan) communication

@@ -51,6 +51,7 @@ from ui.dialogs.case_info_dialog import CaseInfoDialog
 from ui.dialogs.document_info_dialog import DocumentInfoDialog
 from ui.dialogs.case_history_dialog import CaseHistoryDialog
 from ui.dialogs.command_palette import CommandPalette, CommandItem
+from ui.dialogs.scanner_dialog import ScannerDialog
 
 # Services
 from services.document_service import load_document
@@ -286,6 +287,7 @@ class MainWindow(QMainWindow):
         m.open_case_history_requested.connect(self._on_open_case_history)
         m.save_case_requested.connect(self._on_save_case)
         m.command_palette_requested.connect(self._on_command_palette)
+        m.scan_document_requested.connect(self._on_scan_document)
 
         # Toolbar signals
         t = self._toolbar
@@ -300,7 +302,7 @@ class MainWindow(QMainWindow):
             lambda: self._switch_page(NavPage.REPORT_GENERATOR.value)
         )
         t.compare_clicked.connect(lambda: self._show_info("Compare", "Compare tool active in document viewer."))
-        t.scan_clicked.connect(lambda: self._show_info("Scan", "Scanner interface not connected."))
+        t.scan_clicked.connect(self._on_scan_document)
         t.camera_clicked.connect(lambda: self._show_info("Camera", "Camera capture not connected."))
 
         # Dashboard signals
@@ -599,6 +601,12 @@ class MainWindow(QMainWindow):
         )
         if path:
             self._load_document(path)
+
+    def _on_scan_document(self):
+        """Open the scanner dialog and load the scanned document."""
+        dialog = ScannerDialog(self)
+        dialog.document_scanned.connect(self._load_document)
+        dialog.exec_()
 
     def _load_document(self, path: str):
         """Load a document and update the UI cleanly."""

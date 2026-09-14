@@ -49,6 +49,7 @@ class MenuBarManager(QObject):
     open_case_history_requested = pyqtSignal()
     save_case_requested = pyqtSignal()
     command_palette_requested = pyqtSignal()
+    scan_document_requested = pyqtSignal()
 
     def __init__(self, menu_bar: QMenuBar, parent=None):
         super().__init__(parent)
@@ -99,10 +100,10 @@ class MenuBarManager(QObject):
 
         # Acquire submenu
         acq = menu.addMenu("Acquire")
-        self._add_action(acq, "Scan Document", lambda: None)
-        self._add_action(acq, "Scan Multiple Pages", lambda: None)
+        self._add_action(acq, "Scan Document", self.scan_document_requested.emit)
+        self._add_action(acq, "Scan Multiple Pages", self.scan_document_requested.emit)
         self._add_action(acq, "Capture from Camera", lambda: None)
-        self._add_action(acq, "Acquire from Scanner", lambda: None)
+        self._add_action(acq, "Acquire from Scanner", self.scan_document_requested.emit)
 
         menu.addSeparator()
         self._add_action(menu, "Save", self.save_requested.emit,
