@@ -37,10 +37,13 @@ class ReportGenerator:
             f.write("1. CASE DETAILS\n")
             f.write("-" * 20 + "\n")
             f.write(f"Case ID:        {case.case_id}\n")
-            f.write(f"Title:          {case.title}\n")
+            f.write(f"Case Name:      {case.case_name or case.title}\n")
+            f.write(f"Status:         {case.status}\n")
             f.write(f"Examiner:       {case.examiner_name}\n")
             f.write(f"Organization:   {case.organization}\n")
             f.write(f"Date:           {case.date}\n")
+            if hasattr(case, "created_ist_str") and case.created_ist_str():
+                f.write(f"Created (IST):  {case.created_ist_str()}\n")
             f.write(f"Ref Number:     {case.reference_number}\n\n")
 
             f.write("2. EVIDENCE DETAILS\n")
@@ -103,7 +106,7 @@ class ReportGenerator:
             
             c.setFont("Helvetica", 12)
             c.drawString(50, 700, f"Case ID: {case.case_id}")
-            c.drawString(50, 680, f"Title: {case.title}")
+            c.drawString(50, 680, f"Case Name: {case.case_name or case.title}")
             c.drawString(50, 660, f"Evidence ID: {evidence.evidence_id}")
             c.drawString(50, 640, f"SHA-256: {evidence.sha256}")
             

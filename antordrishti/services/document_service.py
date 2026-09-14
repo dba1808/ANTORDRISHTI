@@ -44,11 +44,23 @@ def load_document(file_path: str) -> Optional[DocumentModel]:
             last_modified=info.get("last_modified", ""),
         )
 
-        # Calculate integrity hashes automatically
+        # Calculate integrity hashes automatically from original evidence bytes
         sha256, md5 = calculate_hashes(file_path)
         doc.sha256 = sha256
         doc.md5 = md5
-        doc.integrity_status = "Verified" if sha256 else "Error"
+        doc.integrity_status = "INTEGRITY VERIFIED" if sha256 else "Error"
+
+        # Forensic Metadata Examination on original evidence
+        try:
+            from services.forensic_metadata_service import examine_evidence_metadata
+            exam_data = examine_evidence_metadata(file_path)
+            doc.metadata_record = exam_data
+            doc.detected_format = exam_data.get("signature", {}).get("detected_format", "")
+            doc.format_consistent = exam_data.get("signature", {}).get("is_consistent", True)
+            doc.format_warning = exam_data.get("signature", {}).get("warning", "")
+            doc.forensic_flags = exam_data.get("summary", {}).get("flags", [])
+        except Exception as e:
+            logger.warning(f"Forensic metadata examination notice: {e}")
 
         if is_supported_image(file_path):
             success = _populate_image_info(doc)

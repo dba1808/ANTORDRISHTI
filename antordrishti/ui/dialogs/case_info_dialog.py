@@ -38,12 +38,14 @@ class CaseInfoDialog(QDialog):
 
         if case:
             layout.addWidget(InfoRow("Case ID", case.case_id or "—"))
-            layout.addWidget(InfoRow("Title", case.title or "—"))
-            layout.addWidget(InfoRow("Examiner", case.examiner_name or "—"))
+            layout.addWidget(InfoRow("Case Name", case.case_name or case.title or "—"))
+            layout.addWidget(InfoRow("Status", case.status or "OPEN"))
+            layout.addWidget(InfoRow("Examiner", case.examiner_name or case.examiner or "—"))
             layout.addWidget(InfoRow("Organization", case.organization or "—"))
             layout.addWidget(InfoRow("Reference", case.reference_number or "—"))
             layout.addWidget(InfoRow("Date", case.date or "—"))
-            layout.addWidget(InfoRow("Status", case.status or "Open"))
+            if hasattr(case, "created_ist_str") and case.created_ist_str():
+                layout.addWidget(InfoRow("Created (IST)", case.created_ist_str()))
             layout.addWidget(Separator())
             layout.addWidget(SectionLabel("Description"))
             desc = QLabel(case.description or "No description provided.")

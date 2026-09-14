@@ -486,6 +486,17 @@ class DocumentViewer(QWidget):
         self.overlay_slider.setVisible(mode == "overlay")
         self._comparison_ws.set_mode(mode)
 
+    def set_mode(self, mode: str):
+        """Set active view mode ('processed', 'original', 'split', 'overlay')."""
+        mode_btn_map = {
+            "processed": self.btn_view_proc,
+            "original": self.btn_view_orig,
+            "split": self.btn_view_split,
+            "overlay": self.btn_view_overlay,
+        }
+        btn = mode_btn_map.get(mode, self.btn_view_proc)
+        self._on_mode_button_clicked(mode, btn)
+
     def _build_filmstrip(self) -> QWidget:
         strip = QWidget()
         strip.setFixedWidth(130)

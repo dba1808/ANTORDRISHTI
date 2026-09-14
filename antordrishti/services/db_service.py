@@ -46,6 +46,7 @@ class DatabaseService:
             CREATE TABLE IF NOT EXISTS cases (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 case_id TEXT UNIQUE NOT NULL,
+                case_name TEXT NOT NULL DEFAULT '',
                 title TEXT NOT NULL DEFAULT '',
                 examiner TEXT NOT NULL DEFAULT '',
                 organization TEXT DEFAULT '',
@@ -53,7 +54,7 @@ class DatabaseService:
                 reference_number TEXT DEFAULT '',
                 date TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
-                status TEXT DEFAULT 'Open',
+                status TEXT DEFAULT 'OPEN',
                 created_at TEXT NOT NULL,
                 modified_at TEXT NOT NULL
             );
@@ -76,6 +77,25 @@ class DatabaseService:
                 imported_at TEXT DEFAULT '',
                 file_type TEXT DEFAULT '',
                 file_size INTEGER DEFAULT 0,
+                mime_type TEXT DEFAULT '',
+                page_count INTEGER DEFAULT 1,
+                width INTEGER DEFAULT 0,
+                height INTEGER DEFAULT 0,
+                FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS metadata_examinations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id TEXT NOT NULL,
+                evidence_id TEXT NOT NULL,
+                file_path TEXT NOT NULL DEFAULT '',
+                sha256 TEXT NOT NULL DEFAULT '',
+                detected_format TEXT DEFAULT '',
+                status TEXT DEFAULT '',
+                flags_json TEXT DEFAULT '[]',
+                summary_json TEXT DEFAULT '{}',
+                full_data_json TEXT DEFAULT '{}',
+                examined_at TEXT NOT NULL,
                 FOREIGN KEY (case_id) REFERENCES cases(case_id) ON DELETE CASCADE
             );
 
@@ -185,15 +205,36 @@ class DatabaseService:
                 value TEXT DEFAULT ''
             );
 
+            CREATE INDEX IF NOT EXISTS idx_meta_evidence ON metadata_examinations(evidence_id);
+            CREATE INDEX IF NOT EXISTS idx_meta_case ON metadata_examinations(case_id);
             CREATE INDEX IF NOT EXISTS idx_evidence_case ON evidence_items(case_id);
             CREATE INDEX IF NOT EXISTS idx_evidence_path ON evidence_items(file_path);
             CREATE INDEX IF NOT EXISTS idx_ocr_evidence ON ocr_results(evidence_id);
             CREATE INDEX IF NOT EXISTS idx_history_evidence ON processing_history(evidence_id);
             CREATE INDEX IF NOT EXISTS idx_recent_opened ON recent_files(opened_at DESC);
         """)
+        # Safe schema migration for older databases
+        self._ensure_column("cases", "case_name", "TEXT DEFAULT ''")
         self._ensure_column("evidence_items", "imported_at", "TEXT DEFAULT ''")
         self._ensure_column("evidence_items", "file_type", "TEXT DEFAULT ''")
         self._ensure_column("evidence_items", "file_size", "INTEGER DEFAULT 0")
+        self._ensure_column("evidence_items", "mime_type", "TEXT DEFAULT ''")
+        self._ensure_column("evidence_items", "page_count", "INTEGER DEFAULT 1")
+        self._ensure_column("evidence_items", "width", "INTEGER DEFAULT 0")
+        self._ensure_column("evidence_items", "height", "INTEGER DEFAULT 0")
+
+        # Migrate existing case names and titles safely
+        try:
+            self._conn.execute("""
+                UPDATE cases SET case_name = title 
+                WHERE (case_name IS NULL OR case_name = '') AND (title IS NOT NULL AND title != '')
+            """)
+            self._conn.execute("""
+                UPDATE cases SET title = case_name 
+                WHERE (title IS NULL OR title = '') AND (case_name IS NOT NULL AND case_name != '')
+            """)
+        except Exception as e:
+            logger.debug(f"Case name migration notice: {e}")
 
         self._ensure_column("ocr_results", "raw_text", "TEXT DEFAULT ''")
         self._ensure_column("ocr_results", "normalized_text", "TEXT DEFAULT ''")
@@ -230,26 +271,29 @@ class DatabaseService:
         """Insert a new case. Returns True on success."""
         try:
             now = datetime.now().isoformat()
+            canonical_name = str(case_data.get("case_name") or case_data.get("title") or "")
             self._conn.execute(
                 """INSERT INTO cases
-                   (case_id, title, examiner, organization, description,
+                   (case_id, case_name, title, examiner, organization, description,
                     reference_number, date, notes, status, created_at, modified_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     case_data.get("case_id", ""),
-                    case_data.get("title", ""),
-                    case_data.get("examiner_name", ""),
+                    canonical_name,
+                    canonical_name,
+                    case_data.get("examiner") or case_data.get("examiner_name") or "",
                     case_data.get("organization", ""),
                     case_data.get("description", ""),
                     case_data.get("reference_number", ""),
                     case_data.get("date", ""),
                     case_data.get("notes", ""),
-                    case_data.get("status", "Open"),
-                    now, now
+                    str(case_data.get("status") or "OPEN").upper(),
+                    case_data.get("created_at") or now,
+                    case_data.get("modified_at") or now,
                 )
             )
             self._conn.commit()
-            logger.info(f"Case created in DB: {case_data.get('case_id')}")
+            logger.info(f"Case created in DB: {case_data.get('case_id')} ({canonical_name})")
             return True
         except sqlite3.IntegrityError:
             logger.warning(f"Case ID already exists: {case_data.get('case_id')}")
@@ -289,11 +333,16 @@ class DatabaseService:
     def update_case(self, case_id: str, updates: Dict[str, Any]) -> bool:
         """Update a case's fields."""
         try:
-            allowed = {"title", "examiner", "organization", "description",
+            allowed = {"case_name", "title", "examiner", "organization", "description",
                        "reference_number", "date", "notes", "status"}
             filtered = {k: v for k, v in updates.items() if k in allowed}
             if not filtered:
                 return False
+
+            if "case_name" in filtered and "title" not in filtered:
+                filtered["title"] = filtered["case_name"]
+            elif "title" in filtered and "case_name" not in filtered:
+                filtered["case_name"] = filtered["title"]
 
             filtered["modified_at"] = datetime.now().isoformat()
             set_clause = ", ".join(f"{k} = ?" for k in filtered)
@@ -356,10 +405,28 @@ class DatabaseService:
             return 0
 
     def generate_case_id(self) -> str:
-        """Auto-generate a Case ID in format CASE-YYYY-NNN."""
+        """Auto-generate a Case ID in format CASE-YYYY-NNNNNN."""
         year = datetime.now().strftime("%Y")
-        count = self.get_case_count() + 1
-        return f"CASE-{year}-{count:03d}"
+        try:
+            rows = self._conn.execute(
+                "SELECT case_id FROM cases WHERE case_id LIKE ?",
+                (f"CASE-{year}-%",)
+            ).fetchall()
+            max_num = 0
+            for row in rows:
+                cid = str(row["case_id"])
+                parts = cid.split("-")
+                if len(parts) >= 3 and parts[-1].isdigit():
+                    max_num = max(max_num, int(parts[-1]))
+            next_num = max_num + 1
+        except Exception:
+            next_num = self.get_case_count() + 1
+
+        case_id = f"CASE-{year}-{next_num:06d}"
+        while self.get_case(case_id):
+            next_num += 1
+            case_id = f"CASE-{year}-{next_num:06d}"
+        return case_id
 
     # ── Evidence Operations ──────────────────────────────────
 
@@ -371,8 +438,9 @@ class DatabaseService:
                 """INSERT INTO evidence_items
                    (case_id, evidence_id, name, evidence_type, source,
                     file_path, sha256, md5, status, notes, reviewed, relevant,
-                    created_at, imported_at, file_type, file_size)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    created_at, imported_at, file_type, file_size,
+                    mime_type, page_count, width, height)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     evidence_data.get("case_id", ""),
                     evidence_data.get("evidence_id", ""),
@@ -390,6 +458,10 @@ class DatabaseService:
                     evidence_data.get("imported_at", now),
                     evidence_data.get("file_type", ""),
                     int(evidence_data.get("file_size", 0) or 0),
+                    str(evidence_data.get("mime_type", "") or ""),
+                    int(evidence_data.get("page_count", 1) or 1),
+                    int(evidence_data.get("width", 0) or 0),
+                    int(evidence_data.get("height", 0) or 0),
                 )
             )
             self._conn.commit()
@@ -435,9 +507,22 @@ class DatabaseService:
             return 0
 
     def generate_evidence_id(self, case_id: str) -> str:
-        """Auto-generate evidence ID: EVD-001, EVD-002, etc."""
-        count = self.get_evidence_count_for_case(case_id) + 1
-        return f"EVD-{count:03d}"
+        """Auto-generate evidence ID: EVD-000001, EVD-000002, etc."""
+        try:
+            rows = self._conn.execute(
+                "SELECT evidence_id FROM evidence_items WHERE case_id = ?",
+                (case_id,)
+            ).fetchall()
+            max_num = 0
+            for row in rows:
+                eid = str(row["evidence_id"])
+                parts = eid.split("-")
+                if len(parts) >= 2 and parts[-1].isdigit():
+                    max_num = max(max_num, int(parts[-1]))
+            next_num = max_num + 1
+        except Exception:
+            next_num = self.get_evidence_count_for_case(case_id) + 1
+        return f"EVD-{next_num:06d}"
 
     def update_evidence(self, evidence_id: str, case_id: str,
                         updates: Dict[str, Any]) -> bool:
@@ -691,6 +776,91 @@ class DatabaseService:
             return True
         except Exception:
             return False
+
+    # ── Metadata Examination Operations ──────────────────────
+
+    def save_metadata_examination(self, exam_data: Dict[str, Any]) -> bool:
+        """Save forensic metadata examination linked to case_id and evidence_id."""
+        try:
+            now = datetime.now().isoformat()
+            self._conn.execute(
+                """INSERT INTO metadata_examinations
+                   (case_id, evidence_id, file_path, sha256, detected_format,
+                    status, flags_json, summary_json, full_data_json, examined_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    exam_data.get("case_id", ""),
+                    exam_data.get("evidence_id", ""),
+                    exam_data.get("file_path", ""),
+                    exam_data.get("sha256", ""),
+                    exam_data.get("detected_format", ""),
+                    exam_data.get("status", "EXAMINED"),
+                    json.dumps(exam_data.get("flags", [])),
+                    json.dumps(exam_data.get("summary", {})),
+                    json.dumps(exam_data.get("full_data", {})),
+                    now
+                )
+            )
+            self._conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving metadata examination: {e}")
+            return False
+
+    def get_metadata_examination(self, evidence_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve most recent metadata examination for an evidence item."""
+        try:
+            row = self._conn.execute(
+                "SELECT * FROM metadata_examinations WHERE evidence_id = ? ORDER BY id DESC LIMIT 1",
+                (evidence_id,)
+            ).fetchone()
+            if not row:
+                return None
+            res = dict(row)
+            try:
+                res["flags"] = json.loads(res.get("flags_json") or "[]")
+            except Exception:
+                res["flags"] = []
+            try:
+                res["summary"] = json.loads(res.get("summary_json") or "{}")
+            except Exception:
+                res["summary"] = {}
+            try:
+                res["full_data"] = json.loads(res.get("full_data_json") or "{}")
+            except Exception:
+                res["full_data"] = {}
+            return res
+        except Exception as e:
+            logger.error(f"Error fetching metadata examination for {evidence_id}: {e}")
+            return None
+
+    def get_all_metadata_examinations_for_case(self, case_id: str) -> List[Dict[str, Any]]:
+        """Retrieve all metadata examinations for a given case."""
+        try:
+            rows = self._conn.execute(
+                "SELECT * FROM metadata_examinations WHERE case_id = ? ORDER BY examined_at DESC",
+                (case_id,)
+            ).fetchall()
+            results = []
+            for row in rows:
+                item = dict(row)
+                try:
+                    item["flags"] = json.loads(item.get("flags_json") or "[]")
+                except Exception:
+                    item["flags"] = []
+                try:
+                    item["summary"] = json.loads(item.get("summary_json") or "{}")
+                except Exception:
+                    item["summary"] = {}
+                try:
+                    item["full_data"] = json.loads(item.get("full_data_json") or "{}")
+                except Exception:
+                    item["full_data"] = {}
+                results.append(item)
+            return results
+        except Exception as e:
+            logger.error(f"Error fetching case metadata examinations: {e}")
+            return []
 
     # ── Cleanup ───────────────────────────────────────────────
 

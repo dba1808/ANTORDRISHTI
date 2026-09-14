@@ -28,6 +28,10 @@ class EvidenceModel:
 
     file_type: str = ""
     file_size: int = 0
+    mime_type: str = ""
+    page_count: int = 1
+    width: int = 0
+    height: int = 0
     imported_at: Optional[datetime] = None
     ocr_runs: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -54,6 +58,10 @@ class EvidenceModel:
             "relevant": self.relevant,
             "file_type": self.file_type,
             "file_size": self.file_size,
+            "mime_type": self.mime_type,
+            "page_count": self.page_count,
+            "width": self.width,
+            "height": self.height,
         }
 
     @classmethod
@@ -73,20 +81,24 @@ class EvidenceModel:
                 pass
 
         return cls(
-            evidence_id=data.get("evidence_id", ""),
-            case_id=data.get("case_id", ""),
-            name=data.get("name", ""),
-            evidence_type=data.get("evidence_type", "Original Evidence"),
-            source=data.get("source", ""),
-            file_path=data.get("file_path", ""),
-            sha256=data.get("sha256", ""),
-            md5=data.get("md5", ""),
-            status=data.get("status", "Pending"),
-            notes=data.get("notes", ""),
+            evidence_id=str(data.get("evidence_id") or ""),
+            case_id=str(data.get("case_id") or ""),
+            name=str(data.get("name") or ""),
+            evidence_type=str(data.get("evidence_type") or "Original Evidence"),
+            source=str(data.get("source") or ""),
+            file_path=str(data.get("file_path") or ""),
+            sha256=str(data.get("sha256") or ""),
+            md5=str(data.get("md5") or ""),
+            status=str(data.get("status") or "Pending"),
+            notes=str(data.get("notes") or ""),
             reviewed=bool(data.get("reviewed", False)),
             relevant=bool(data.get("relevant", False)),
-            file_type=data.get("file_type", ""),
+            file_type=str(data.get("file_type") or ""),
             file_size=int(data.get("file_size", 0) or 0),
+            mime_type=str(data.get("mime_type") or ""),
+            page_count=int(data.get("page_count", 1) or 1),
+            width=int(data.get("width", 0) or 0),
+            height=int(data.get("height", 0) or 0),
             created=created,
             imported_at=imported_at,
         )

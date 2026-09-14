@@ -9,6 +9,8 @@ Primary forensic workspace integrating:
 """
 
 from typing import Optional, List
+import os
+import cv2
 import numpy as np
 
 from PyQt5.QtWidgets import (
@@ -27,6 +29,7 @@ from ui.viewer.viewer_toolbar import ViewerToolbar
 from ui.widgets.common import SectionLabel, ActionButton, LabeledSlider, Separator, InfoRow
 
 import services.image_processing as ip
+from services.histogram_service import calculate_forensic_histogram, render_histogram_plot_image
 
 
 class ForensicToolsPanel(QWidget):
@@ -437,6 +440,7 @@ class DocumentAnalysisPage(QWidget):
         # Main Document Viewer with Filmstrip & Comparisons
         self.document_viewer = DocumentViewer()
         self.document_viewer.history_updated.connect(self._on_history_updated)
+        self.document_viewer.page_changed.connect(self._on_page_changed)
         splitter.addWidget(self.document_viewer)
 
         # Right Tools Panel (Histogram, Info, OpenCV Tools, History)
@@ -601,27 +605,59 @@ class DocumentAnalysisPage(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Processing Error", f"Operation failed: {str(e)}")
 
+    def _on_page_changed(self, page_num: int):
+        """Update histogram when PDF page changes."""
+        self._update_histogram()
+
     def _update_histogram(self):
         current_img = self.document_viewer.get_current_image()
         if current_img:
             cv_img = ip.qimage_to_cv(current_img)
             if cv_img is not None:
                 mode_idx = self.tools_panel.hist_combo.currentIndex()
-                mode_map = {0: "all", 1: "red", 2: "green", 3: "blue", 4: "grayscale"}
-                mode = mode_map.get(mode_idx, "all")
-                self._last_hist_image = ip.compute_histogram(cv_img, mode=mode)
+                mode_map = {0: "rgb", 1: "red", 2: "green", 3: "blue", 4: "grayscale"}
+                mode = mode_map.get(mode_idx, "rgb")
+
+                # Build info dict for calculate_forensic_histogram
+                h, w = cv_img.shape[:2]
+                cs = "RGB" if len(cv_img.shape) > 2 and cv_img.shape[2] >= 3 else "Grayscale"
+                info = {
+                    "file_name": os.path.basename(self.document_viewer._current_path) if self.document_viewer._current_path else "Current View",
+                    "file_path": self.document_viewer._current_path,
+                    "page_num": self.document_viewer._current_page + 1,
+                    "total_pages": self.document_viewer._total_pages,
+                    "color_space": cs,
+                    "bit_depth": 8,
+                    "has_alpha": False
+                }
+
+                # Convert OpenCV BGR to RGB for pixel analysis if multi-channel
+                if len(cv_img.shape) == 3 and cv_img.shape[2] == 3:
+                    rgb_img = cv2.cvtColor(cv_img, cv2.COLOR_BGR2RGB)
+                else:
+                    rgb_img = cv_img
+
+                hist_data = calculate_forensic_histogram(
+                    pixel_array=rgb_img,
+                    info=info,
+                    channel_mode=mode,
+                    source_label=f"PDF Page {self.document_viewer._current_page + 1}" if self.document_viewer._total_pages > 1 else "Current Evidence"
+                )
+
+                plot_bgr = render_histogram_plot_image(hist_data, mode=mode, width=500, height=280)
+                self._last_hist_image = plot_bgr
                 self.tools_panel.set_histogram_image(self._last_hist_image)
 
-                # Compute statistics
-                mean_v = f"{float(np.mean(cv_img)):.1f}"
-                std_v = f"{float(np.std(cv_img)):.1f}"
-                min_v = f"{int(np.min(cv_img))}"
-                max_v = f"{int(np.max(cv_img))}"
-                self.tools_panel.set_statistics(mean_v, std_v, min_v, max_v)
+                # Compute statistics from hist_data
+                stats = hist_data.stats
+                self.tools_panel.set_statistics(
+                    str(stats.get("mean", "—")),
+                    str(stats.get("std_dev", "—")),
+                    str(stats.get("min", "—")),
+                    str(stats.get("max", "—"))
+                )
 
                 # Update resolution info if not set
-                h, w = cv_img.shape[:2]
-                cs = "RGB" if len(cv_img.shape) > 2 else "Grayscale"
                 self.tools_panel.info_resolution.set_value(f"{w} × {h}")
                 self.tools_panel.info_colorspace.set_value(cs)
 

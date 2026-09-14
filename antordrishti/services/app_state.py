@@ -51,6 +51,12 @@ class ApplicationState(QObject):
         self._context = CurrentDocumentContext(case, evidence, document, 1)
         self.context_changed.emit(self._context)
 
+    def set_case(self, case: Optional[CaseModel], keep_evidence: bool = False) -> None:
+        evidence = self._context.evidence if keep_evidence else None
+        document = self._context.document if keep_evidence else None
+        self._context = CurrentDocumentContext(case=case, evidence=evidence, document=document, current_page=1)
+        self.context_changed.emit(self._context)
+
     def set_current_page(self, page_number: int) -> None:
         if self._context.current_page != page_number:
             self._context.current_page = page_number

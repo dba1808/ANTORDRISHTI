@@ -40,6 +40,7 @@ from ui.pages.document_forensics import DocumentForensicsPage
 from ui.pages.forgery_detection import ForgeryDetectionPage
 from ui.pages.evidence_manager import EvidenceManagerPage
 from ui.pages.evidence_fusion import EvidenceFusionPage
+from ui.pages.histogram_page import HistogramPage
 from ui.pages.reports import ReportsPage
 from ui.pages.batch_processing import BatchProcessingPage
 from ui.pages.settings import SettingsPage
@@ -220,6 +221,7 @@ class MainWindow(QMainWindow):
             (NavPage.OCR, OCRPage),
             (NavPage.WATERMARK, WatermarkPage),
             (NavPage.FORGERY_DETECTION, ForgeryDetectionPage),
+            (NavPage.HISTOGRAM, HistogramPage),
             (NavPage.EVIDENCE_MANAGER, EvidenceManagerPage),
             (NavPage.EVIDENCE_FUSION, EvidenceFusionPage),
             (NavPage.REPORT_GENERATOR, ReportsPage),
@@ -708,39 +710,51 @@ class MainWindow(QMainWindow):
         """Handle file dropped onto viewer."""
         self._load_document(path)
 
+    def _set_active_case(self, case: CaseModel):
+        """Set the authoritative active case across all pages and application state."""
+        self._current_case = case
+        self._status_bar.set_case(case.case_id)
+
+        try:
+            db = get_db()
+            db.save_workspace_state("main_window", {
+                "active_case_id": case.case_id,
+                "active_document": self._current_document.file_path if self._current_document else "",
+                "splitter_sizes": self._main_splitter.sizes() if hasattr(self, "_main_splitter") else []
+            })
+        except Exception:
+            pass
+
+        curr_ev = self._app_state.context.evidence if self._app_state.context else None
+        curr_doc = self._app_state.context.document if self._app_state.context else None
+        if curr_ev and curr_ev.case_id != case.case_id:
+            curr_ev = None
+            curr_doc = None
+            self._current_evidence = None
+            self._current_document = None
+
+        self._app_state.set_current_context(case, curr_ev, curr_doc)
+
     def _ensure_current_case(self) -> CaseModel:
         """Ensure every evidence item belongs to a case."""
         if self._current_case:
             return self._current_case
 
         db = get_db()
-        year = __import__("datetime").datetime.now().strftime("%Y")
-        index = db.get_case_count() + 1
-        case_id = f"ANT-{year}-{index:03d}"
-        while db.get_case(case_id):
-            index += 1
-            case_id = f"ANT-{year}-{index:03d}"
-
+        case_id = db.generate_case_id()
+        now_dt = datetime.now()
         case = CaseModel(
             case_id=case_id,
-            title="Untitled OCR Evidence Case",
+            case_name="Untitled Forensic Investigation Case",
+            title="Untitled Forensic Investigation Case",
             description="Auto-created case for imported evidence.",
-            status="Open",
+            status="OPEN",
+            created=now_dt,
+            modified=now_dt,
         )
         db.create_case(case.to_dict())
-        
-        try:
-            db._conn.execute(
-                """INSERT INTO case_events
-                   (case_id, evidence_id, event_type, description, timestamp)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (case_id, "", "Case Created", "Auto-created case for imported evidence", __import__('datetime').datetime.now().isoformat())
-            )
-            db._conn.commit()
-        except Exception:
-            pass
-            
-        self._status_bar.set_case(case.case_id)
+        db.add_case_event(case_id, "", "Case Created", "Auto-created case for imported evidence")
+        self._set_active_case(case)
         return case
 
     def _register_current_evidence(self, case: CaseModel, doc) -> EvidenceModel:
@@ -749,8 +763,19 @@ class MainWindow(QMainWindow):
         existing = db.get_evidence_by_path(case.case_id, doc.file_path)
         if existing:
             evidence = EvidenceModel.from_dict(existing)
-            evidence.sha256 = doc.sha256
-            evidence.md5 = doc.md5
+            # Reverify SHA-256 integrity
+            if evidence.sha256 and evidence.sha256 != doc.sha256:
+                doc.integrity_status = "INTEGRITY CHANGED"
+                evidence.status = "INTEGRITY CHANGED"
+                db.add_case_event(
+                    case.case_id, evidence.evidence_id, "INTEGRITY CHANGED",
+                    f"SHA-256 mismatch for {doc.file_name}! Recorded: {evidence.sha256[:12]}..., Current: {doc.sha256[:12]}..."
+                )
+            else:
+                doc.integrity_status = "INTEGRITY VERIFIED"
+                evidence.status = "INTEGRITY VERIFIED"
+            evidence.sha256 = evidence.sha256 or doc.sha256
+            evidence.md5 = evidence.md5 or doc.md5
             return evidence
 
         evidence = EvidenceModel(
@@ -762,14 +787,17 @@ class MainWindow(QMainWindow):
             file_path=doc.file_path,
             sha256=doc.sha256,
             md5=doc.md5,
-            status="Verified" if doc.sha256 else "Pending",
+            status="INTEGRITY VERIFIED" if doc.sha256 else "Pending",
             reviewed=False,
             relevant=True,
+            file_type=doc.file_type,
+            file_size=doc.file_size,
+            page_count=doc.page_count,
+            width=doc.width,
+            height=doc.height,
         )
-        data = evidence.to_dict()
-        data["file_type"] = doc.file_type
-        data["file_size"] = doc.file_size
-        db.add_evidence(data)
+        doc.integrity_status = "INTEGRITY VERIFIED" if doc.sha256 else "Pending"
+        db.add_evidence(evidence.to_dict())
         db.add_processing_history(
             case.case_id,
             evidence.evidence_id,
@@ -788,7 +816,10 @@ class MainWindow(QMainWindow):
         for page_name, idx in self._pages.items():
             page = self._workspace.widget(idx)
             if hasattr(page, "set_current_context"):
-                page.set_current_context(context)
+                try:
+                    page.set_current_context(context)
+                except Exception as e:
+                    logger.debug(f"Error syncing context to {page_name}: {e}")
             elif context.document and hasattr(page, "load_document"):
                 try:
                     page.load_document(context.document.file_path)
@@ -796,14 +827,17 @@ class MainWindow(QMainWindow):
                     pass
 
     def _on_context_changed(self, context: CurrentDocumentContext):
-        """Update the current evidence bar from shared state."""
+        """Update the current evidence bar from shared state and broadcast."""
+        self._sync_context_to_pages(context)
         evidence = context.evidence
         doc = context.document
         case = context.case
 
         if not doc:
             self._context_main.setText("No document loaded")
-            case_text = f"Case {case.case_id}" if case else "No active case"
+            case_title = case.case_name if case else "No active case"
+            case_id = case.case_id if case else ""
+            case_text = f"Case {case_id} ({case_title})" if case else "No active case"
             self._doc_meta_label.setText(f"{case_text} — Open an image or PDF to begin examination.")
             self._evidence_id_badge.setVisible(False)
             self._integrity_badge.setVisible(False)
@@ -813,7 +847,7 @@ class MainWindow(QMainWindow):
             self._btn_context_close.setVisible(False)
             return
 
-        evidence_id = evidence.evidence_id if evidence else "EVD-0001"
+        evidence_id = evidence.evidence_id if evidence else "EVD-000001"
         self._evidence_id_badge.setText(evidence_id)
         self._evidence_id_badge.setVisible(True)
 
@@ -823,7 +857,7 @@ class MainWindow(QMainWindow):
         case_id = case.case_id if case else "Unassigned"
         self._doc_meta_label.setText(f"{file_type}  •  {page_str}  •  Case {case_id}")
 
-        status = doc.integrity_status or "Verified"
+        status = doc.integrity_status or "INTEGRITY VERIFIED"
         self._integrity_badge.setText(f"✓ {status}")
         self._integrity_badge.setVisible(True)
 
@@ -946,12 +980,11 @@ class MainWindow(QMainWindow):
         if dialog.exec_() == NewCaseDialog.Accepted:
             case = dialog.get_case()
             if case:
-                self._current_case = case
-                self._status_bar.set_case(case.case_id)
+                self._set_active_case(case)
                 self.statusBar().showMessage(
-                    f"Case created successfully: {case.case_id}", 3000
+                    f"Case created: {case.case_id} — {case.case_name}", 4000
                 )
-                logger.info(f"Case created: {case.case_id}")
+                logger.info(f"Case created and set active: {case.case_id}")
 
     def _on_open_case_history(self):
         """Open the case history browser dialog."""
@@ -961,10 +994,9 @@ class MainWindow(QMainWindow):
 
     def _load_case(self, case: CaseModel):
         """Load a case from the history dialog."""
-        self._current_case = case
-        self._status_bar.set_case(case.case_id)
+        self._set_active_case(case)
         self.statusBar().showMessage(
-            f"Case loaded: {case.case_id} — {case.title}", 4000
+            f"Case loaded: {case.case_id} — {case.case_name}", 4000
         )
         logger.info(f"Case loaded from history: {case.case_id}")
 
@@ -980,6 +1012,7 @@ class MainWindow(QMainWindow):
         try:
             db = get_db()
             updates = {
+                "case_name": self._current_case.case_name,
                 "title": self._current_case.title,
                 "examiner": self._current_case.examiner_name,
                 "organization": self._current_case.organization,
@@ -991,7 +1024,7 @@ class MainWindow(QMainWindow):
             success = db.update_case(self._current_case.case_id, updates)
             if success:
                 self.statusBar().showMessage(
-                    f"Case saved: {self._current_case.case_id}", 3000
+                    f"Case saved: {self._current_case.case_id} — {self._current_case.case_name}", 3000
                 )
             else:
                 self.statusBar().showMessage("Case save failed.", 3000)
@@ -1243,9 +1276,9 @@ class MainWindow(QMainWindow):
             if case_id:
                 case_data = db.get_case(case_id)
                 if case_data:
-                    self._current_case = CaseModel.from_dict(case_data)
-                    self._status_bar.set_case(case_id)
-                    logger.info(f"Restored case: {case_id}")
+                    case = CaseModel.from_dict(case_data)
+                    self._set_active_case(case)
+                    logger.info(f"Restored case: {case_id} — {case.case_name}")
 
             # Restore active document
             doc_path = state.get("active_document", "")

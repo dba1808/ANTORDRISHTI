@@ -1,27 +1,41 @@
 """
-Antordrishti — Metadata Sanitization Page
+Antordrishti — Forensic Metadata Examination Page
+Rigorous digital forensic metadata examination, container analysis, and anomaly detection.
 """
+
+import os
+import json
+import logging
+from typing import Dict, Any, List, Optional, Tuple
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTabWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
-    QScrollArea, QMessageBox
+    QScrollArea, QMessageBox, QFileDialog, QLineEdit, QTextEdit
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 
 from app.theme import Colors, Spacing, Bg, Border, Text, Brand
-from ui.widgets.common import (
-    SectionLabel, ActionButton, EngineNotConnectedWidget, Separator
+from ui.widgets.common import ActionButton, Separator
+from services.forensic_metadata_service import (
+    examine_evidence_metadata,
+    export_metadata_to_json,
+    export_metadata_to_txt,
 )
+from services.metadata_service import sanitize_metadata
+from services.db_service import get_db
+
+logger = logging.getLogger("antordrishti.metadata")
 
 
 class _MetadataTable(QTableWidget):
-    """Metadata property-value-source table with professional forensic styling."""
+    """Forensic metadata Property | Value | Source table with clean, professional styling."""
 
     def __init__(self, headers=None, parent=None):
         super().__init__(parent)
         if headers is None:
-            headers = ["Property", "Value", "Category"]
+            headers = ["Property", "Value", "Source"]
         self.setColumnCount(len(headers))
         self.setHorizontalHeaderLabels(headers)
         self.horizontalHeader().setStretchLastSection(False)
@@ -37,8 +51,9 @@ class _MetadataTable(QTableWidget):
             QTableWidget {{
                 background-color: {Bg.WHITE};
                 border: 1px solid {Border.DEFAULT};
-                border-radius: 6px;
+                border-radius: 4px;
                 gridline-color: transparent;
+                font-size: 12px;
             }}
             QTableWidget::item {{
                 padding: 6px 10px;
@@ -61,36 +76,37 @@ class _MetadataTable(QTableWidget):
 
 
 class MetadataPage(QWidget):
-    """Metadata sanitization and deep structural examination page."""
+    """Forensic metadata examination and deep container analysis page."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._all_rows = {}  # tab_name -> list of (prop, val, cat)
+        self._all_rows: Dict[str, List[Tuple[str, str, str]]] = {}
         self._current_doc = None
-        
+        self._current_context = None
+        self._current_exam_data: Optional[Dict[str, Any]] = None
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Title Bar
+        # ── Title Bar ─────────────────────────────────────────
         title_bar = QWidget()
-        title_bar.setFixedHeight(48)
+        title_bar.setFixedHeight(50)
         title_bar.setStyleSheet(f"""
             background-color: {Bg.WHITE};
             border-bottom: 1px solid {Border.DEFAULT};
         """)
         tb_layout = QHBoxLayout(title_bar)
         tb_layout.setContentsMargins(Spacing.LG, 0, Spacing.LG, 0)
-        
-        title = QLabel("Metadata Analysis & Sanitization")
-        title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Text.PRIMARY};")
+
+        title = QLabel("METADATA EXAMINATION")
+        title.setStyleSheet(f"font-size: 14px; font-weight: 700; letter-spacing: 0.5px; color: {Text.PRIMARY};")
         tb_layout.addWidget(title)
-        
+
         tb_layout.addSpacing(16)
-        # Search Filter
-        from PyQt5.QtWidgets import QLineEdit
+        # Search / Filter
         self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("Filter metadata properties or values...")
+        self._search_input.setPlaceholderText("Filter properties, values, or sources...")
         self._search_input.setClearButtonEnabled(True)
         self._search_input.setFixedWidth(280)
         self._search_input.setStyleSheet(f"""
@@ -109,58 +125,87 @@ class MetadataPage(QWidget):
         """)
         self._search_input.textChanged.connect(self._apply_filter)
         tb_layout.addWidget(self._search_input)
-        
+
         tb_layout.addStretch()
+
+        # Action buttons
+        self._btn_export_json = ActionButton("Export JSON")
+        self._btn_export_txt = ActionButton("Export TXT")
+        self._btn_sanitize = ActionButton("Sanitize Derivative Copy")
+
+        self._btn_export_json.clicked.connect(self._on_export_json)
+        self._btn_export_txt.clicked.connect(self._on_export_txt)
+        self._btn_sanitize.clicked.connect(self._on_sanitize)
+
+        tb_layout.addWidget(self._btn_export_json)
+        tb_layout.addWidget(self._btn_export_txt)
+        tb_layout.addWidget(self._btn_sanitize)
+
         layout.addWidget(title_bar)
 
-        # Content
-        content = QHBoxLayout()
-        content.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        content.setSpacing(Spacing.LG)
-
-        # Left: Metadata tabs
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(Spacing.MD)
-
-        # Software trace banner
-        self._software_banner = QFrame()
-        self._software_banner.setStyleSheet(f"""
+        # ── Evidence & Summary Header Banner ──────────────────
+        summary_panel = QFrame()
+        summary_panel.setStyleSheet(f"""
             QFrame {{
                 background-color: {Bg.SECONDARY};
-                border: 1px solid {Border.DEFAULT};
-                border-radius: 6px;
-                padding: 4px 8px;
+                border-bottom: 1px solid {Border.DEFAULT};
+                padding: 6px 16px;
             }}
         """)
-        sb_layout = QHBoxLayout(self._software_banner)
-        sb_layout.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
-        self._software_icon_lbl = QLabel("ℹ")
-        self._software_icon_lbl.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {Brand.GOLD};")
-        self._software_trace_lbl = QLabel("Software Trace: No editing tool signatures detected.")
-        self._software_trace_lbl.setStyleSheet(f"font-size: 12px; font-weight: 500; color: {Text.PRIMARY};")
-        sb_layout.addWidget(self._software_icon_lbl)
-        sb_layout.addWidget(self._software_trace_lbl, 1)
-        left_layout.addWidget(self._software_banner)
+        sp_layout = QVBoxLayout(summary_panel)
+        sp_layout.setContentsMargins(Spacing.LG, Spacing.SM, Spacing.LG, Spacing.SM)
+        sp_layout.setSpacing(4)
 
+        # Row 1: Evidence identification line
+        self._lbl_evidence_line = QLabel("No document loaded  •  Case: Unassigned")
+        self._lbl_evidence_line.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {Text.PRIMARY};")
+        sp_layout.addWidget(self._lbl_evidence_line)
+
+        # Row 2: Metadata status pills
+        self._pills_layout = QHBoxLayout()
+        self._pills_layout.setSpacing(8)
+
+        self._pill_meta_status = self._create_pill("Metadata Status", "NONE", "#64748B", "#F1F5F9")
+        self._pill_exif = self._create_pill("EXIF", "Not Available", "#64748B", "#F1F5F9")
+        self._pill_xmp = self._create_pill("XMP", "Not Available", "#64748B", "#F1F5F9")
+        self._pill_iptc = self._create_pill("IPTC", "Not Available", "#64748B", "#F1F5F9")
+        self._pill_gps = self._create_pill("GPS", "Not Available", "#64748B", "#F1F5F9")
+        self._pill_software = self._create_pill("Software", "Not Available", "#64748B", "#F1F5F9")
+        self._pill_integrity = self._create_pill("Integrity", "—", "#64748B", "#F1F5F9")
+        self._pill_consistency = self._create_pill("Consistency", "—", "#64748B", "#F1F5F9")
+
+        self._pills_layout.addWidget(self._pill_meta_status)
+        self._pills_layout.addWidget(self._pill_exif)
+        self._pills_layout.addWidget(self._pill_xmp)
+        self._pills_layout.addWidget(self._pill_iptc)
+        self._pills_layout.addWidget(self._pill_gps)
+        self._pills_layout.addWidget(self._pill_software)
+        self._pills_layout.addWidget(self._pill_integrity)
+        self._pills_layout.addWidget(self._pill_consistency)
+        self._pills_layout.addStretch()
+
+        sp_layout.addLayout(self._pills_layout)
+        layout.addWidget(summary_panel)
+
+        # ── Main Tabs ─────────────────────────────────────────
         self._tabs = QTabWidget()
         self._tabs.setStyleSheet(f"""
             QTabWidget::pane {{
                 border: 1px solid {Border.DEFAULT};
                 background-color: {Bg.WHITE};
-                border-radius: 6px;
+                margin-top: -1px;
             }}
             QTabBar::tab {{
                 background-color: {Bg.SECONDARY};
                 color: {Text.SECONDARY};
-                padding: 7px 16px;
+                padding: 8px 16px;
                 border: 1px solid {Border.DEFAULT};
                 border-bottom: none;
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
                 margin-right: 2px;
                 font-weight: 500;
+                font-size: 11.5px;
             }}
             QTabBar::tab:selected {{
                 background-color: {Bg.WHITE};
@@ -169,358 +214,441 @@ class MetadataPage(QWidget):
                 border-bottom: 2px solid {Brand.GOLD};
             }}
         """)
-        self._tables = {}
 
-        for tab_name in ["EXIF", "XMP", "IPTC", "PDF Metadata", "Software Info"]:
-            table = _MetadataTable()
-            placeholder_data = [
-                ("Status", "No document loaded", "General"),
-            ]
-            self._tables[tab_name] = table
-            self._all_rows[tab_name] = placeholder_data
-            self._render_table(tab_name, placeholder_data)
-            self._tabs.addTab(table, tab_name)
+        self._tab_names = [
+            "EXIF",
+            "XMP",
+            "IPTC",
+            "PDF",
+            "FILE",
+            "JPEG / CONTAINER",
+            "SOFTWARE",
+            "CONSISTENCY",
+            "RAW"
+        ]
 
-        left_layout.addWidget(self._tabs, 1)
-        content.addWidget(left_container, 1)
+        self._tables: Dict[str, _MetadataTable] = {}
 
-        # Right: Actions and Forensic Warnings
-        actions_panel = QFrame()
-        actions_panel.setFixedWidth(280)
-        actions_panel.setStyleSheet(f"""
-            QFrame#ActionsPanel {{
-                background-color: {Bg.WHITE};
-                border: 1px solid {Border.DEFAULT};
-                border-radius: 8px;
-            }}
+        for tab_name in self._tab_names:
+            if tab_name == "RAW":
+                raw_container = QWidget()
+                rc_layout = QVBoxLayout(raw_container)
+                rc_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+                self._raw_text_view = QTextEdit()
+                self._raw_text_view.setReadOnly(True)
+                self._raw_text_view.setStyleSheet(f"""
+                    QTextEdit {{
+                        background-color: #0F172A;
+                        color: #E2E8F0;
+                        font-family: Consolas, 'Courier New', monospace;
+                        font-size: 11.5px;
+                        border: 1px solid {Border.DEFAULT};
+                        border-radius: 4px;
+                        padding: 10px;
+                    }}
+                """)
+                self._raw_text_view.setPlainText("No metadata examination loaded.")
+                rc_layout.addWidget(self._raw_text_view)
+                self._tabs.addTab(raw_container, tab_name)
+
+            elif tab_name == "CONSISTENCY":
+                cons_container = QWidget()
+                cc_layout = QVBoxLayout(cons_container)
+                cc_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+                cc_layout.setSpacing(Spacing.SM)
+
+                incons_lbl = QLabel("Observed Discrepancies & Anomaly Indicators")
+                incons_lbl.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {Text.PRIMARY};")
+                cc_layout.addWidget(incons_lbl)
+
+                self._incons_table = _MetadataTable(headers=["Field", "Observed Value", "Comparison / Reason"])
+                cc_layout.addWidget(self._incons_table, 1)
+
+                timeline_lbl = QLabel("Forensic Observed Timeline")
+                timeline_lbl.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {Text.PRIMARY}; margin-top: 6px;")
+                cc_layout.addWidget(timeline_lbl)
+
+                self._timeline_table = _MetadataTable(headers=["Event / Source", "Observed Timestamp", "Source Context"])
+                cc_layout.addWidget(self._timeline_table, 1)
+
+                self._tabs.addTab(cons_container, tab_name)
+
+            else:
+                table = _MetadataTable()
+                placeholder_data = [("Status", "No document loaded", "General")]
+                self._tables[tab_name] = table
+                self._all_rows[tab_name] = placeholder_data
+                self._render_table(table, placeholder_data)
+                self._tabs.addTab(table, tab_name)
+
+        layout.addWidget(self._tabs, 1)
+
+    def _create_pill(self, label: str, value: str, text_color: str, bg_color: str) -> QLabel:
+        """Create a summary badge pill."""
+        pill = QLabel(f"{label}: {value}")
+        pill.setStyleSheet(f"""
+            background-color: {bg_color};
+            color: {text_color};
+            border: 1px solid {Border.DEFAULT};
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 600;
         """)
-        actions_panel.setObjectName("ActionsPanel")
-        act_layout = QVBoxLayout(actions_panel)
-        act_layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        act_layout.setSpacing(Spacing.MD)
+        return pill
 
-        act_layout.addWidget(SectionLabel("Forensic Operations"))
-        
-        self._btn_detect = ActionButton("Detect Anomalies", primary=True)
-        self._btn_sanitize = ActionButton("Sanitize Metadata (Strip)")
-        self._btn_export = ActionButton("Export Metadata Report")
-        
-        act_layout.addWidget(self._btn_detect)
-        act_layout.addWidget(self._btn_sanitize)
-        act_layout.addWidget(self._btn_export)
-        
-        self._btn_detect.clicked.connect(self._on_detect_anomalies)
-        self._btn_sanitize.clicked.connect(self._on_sanitize)
-        self._btn_export.clicked.connect(self._on_export_report)
-        
-        act_layout.addWidget(Separator())
+    def _update_pill(self, pill: QLabel, label: str, value: str, status_type: str):
+        """Update badge text and colors based on status."""
+        text_color = "#475569"
+        bg_color = "#F1F5F9"
 
-        # Safe Forensic Warning Card
-        warn_card = QFrame()
-        warn_card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Colors.WARNING_LIGHT};
-                border: 1px solid #FCD34D;
-                border-radius: 6px;
-                padding: 6px;
-            }}
+        if status_type in ("PRESENT", "VERIFIED", "NO_ANOMALY", "YES"):
+            text_color = "#065F46"
+            bg_color = "#D1FAE5"
+        elif status_type in ("LIMITED", "WARNING"):
+            text_color = "#92400E"
+            bg_color = "#FEF3C7"
+        elif status_type in ("MISMATCH", "CHANGED", "ERROR", "HIGH"):
+            text_color = "#991B1B"
+            bg_color = "#FEE2E2"
+
+        pill.setText(f"{label}: {value}")
+        pill.setStyleSheet(f"""
+            background-color: {bg_color};
+            color: {text_color};
+            border: 1px solid {Border.DEFAULT};
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 600;
         """)
-        wc_layout = QVBoxLayout(warn_card)
-        wc_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        wc_layout.setSpacing(4)
-        
-        wc_title = QLabel("Forensic Integrity Notice")
-        wc_title.setStyleSheet("font-weight: 700; font-size: 11px; color: #92400E;")
-        wc_msg = QLabel(
-            "Sanitization creates a derivative sanitized copy. "
-            "The original primary evidence file remains strictly read-only and immutable."
-        )
-        wc_msg.setWordWrap(True)
-        wc_msg.setStyleSheet("font-size: 10.5px; color: #78350F; line-height: 14px;")
-        wc_layout.addWidget(wc_title)
-        wc_layout.addWidget(wc_msg)
-        act_layout.addWidget(warn_card)
 
-        # Hash Comparison Container
-        self._hash_card = QFrame()
-        self._hash_card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {Bg.SECONDARY};
-                border: 1px solid {Border.DEFAULT};
-                border-radius: 6px;
-            }}
-        """)
-        hc_layout = QVBoxLayout(self._hash_card)
-        hc_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        hc_layout.setSpacing(4)
-        
-        hc_title = QLabel("Integrity Hashes")
-        hc_title.setStyleSheet(f"font-weight: 700; font-size: 11px; color: {Text.PRIMARY};")
-        hc_layout.addWidget(hc_title)
-        
-        self._lbl_orig_hash = QLabel("Original SHA-256:\n—")
-        self._lbl_orig_hash.setStyleSheet(f"font-family: monospace; font-size: 10px; color: {Text.SECONDARY};")
-        self._lbl_orig_hash.setWordWrap(True)
-        hc_layout.addWidget(self._lbl_orig_hash)
-        
-        self._lbl_san_hash = QLabel("Sanitized SHA-256:\n—")
-        self._lbl_san_hash.setStyleSheet(f"font-family: monospace; font-size: 10px; color: {Colors.SUCCESS};")
-        self._lbl_san_hash.setWordWrap(True)
-        hc_layout.addWidget(self._lbl_san_hash)
-        
-        act_layout.addWidget(self._hash_card)
+    def _render_table(self, table: QTableWidget, rows: List[Tuple[str, str, str]]):
+        """Render Property | Value | Source rows into a table."""
+        table.setRowCount(len(rows))
+        for r_idx, row in enumerate(rows):
+            prop = str(row[0])
+            val = str(row[1])
+            src = str(row[2]) if len(row) > 2 else ""
 
-        act_layout.addStretch()
-        content.addWidget(actions_panel)
+            item_p = QTableWidgetItem(prop)
+            item_v = QTableWidgetItem(val)
+            item_s = QTableWidgetItem(src)
 
-        layout.addLayout(content, 1)
+            # Subtle color for Not Available
+            if val in ("Not Available", "Not Detected", "No metadata loaded"):
+                item_v.setForeground(QColor("#94A3B8"))
+
+            table.setItem(r_idx, 0, item_p)
+            table.setItem(r_idx, 1, item_v)
+            table.setItem(r_idx, 2, item_s)
+
+    def set_document(self, doc):
+        """Convenience method to set current document directly."""
+        self._current_doc = doc
+        if doc and getattr(doc, "file_path", None):
+            self.load_document(doc.file_path)
+        else:
+            self.set_current_context(None)
 
     def set_current_context(self, context):
-        """Update metadata view from the shared active document context."""
-        if context and context.document:
-            self.load_document(context.document.file_path)
-        else:
+        """Update metadata view strictly from the shared active document context."""
+        self._current_context = context
+        doc = context.document if context else None
+        case = context.case if context else None
+        evidence = context.evidence if context else None
+
+        if not doc or not doc.file_path:
             self._current_doc = None
-            for tab_name in ["EXIF", "XMP", "IPTC", "PDF Metadata", "Software Info"]:
+            self._current_exam_data = None
+            case_info = f"Case: {case.case_name} ({case.case_id})" if case else "No active case"
+            self._lbl_evidence_line.setText(f"No document loaded  •  {case_info}")
+
+            # Reset badges
+            self._update_pill(self._pill_meta_status, "Metadata", "NONE", "NONE")
+            self._update_pill(self._pill_exif, "EXIF", "Not Available", "NONE")
+            self._update_pill(self._pill_xmp, "XMP", "Not Available", "NONE")
+            self._update_pill(self._pill_iptc, "IPTC", "Not Available", "NONE")
+            self._update_pill(self._pill_gps, "GPS", "Not Available", "NONE")
+            self._update_pill(self._pill_software, "Software", "Not Available", "NONE")
+            self._update_pill(self._pill_integrity, "Integrity", "—", "NONE")
+            self._update_pill(self._pill_consistency, "Consistency", "—", "NONE")
+
+            for tab_name, table in self._tables.items():
                 self._all_rows[tab_name] = [("Status", "No document loaded", "General")]
-                self._render_table(tab_name, self._all_rows[tab_name])
-            self._lbl_orig_hash.setText("Original SHA-256:\n—")
-            self._lbl_san_hash.setText("Sanitized SHA-256:\n—")
-            self._software_trace_lbl.setText("Software Trace: No document loaded.")
+                self._render_table(table, self._all_rows[tab_name])
 
-    def load_document(self, file_path: str):
-        """Load metadata from the already-open active document."""
-        from services.document_service import load_document
+            if hasattr(self, "_incons_table"):
+                self._incons_table.setRowCount(0)
+            if hasattr(self, "_timeline_table"):
+                self._timeline_table.setRowCount(0)
+            if hasattr(self, "_raw_text_view"):
+                self._raw_text_view.setPlainText("No document loaded.")
+            return
 
-        doc = load_document(file_path)
+        # Load metadata strictly from original evidence
         self._current_doc = doc
-        if not doc:
-            for tab_name in self._tables:
-                self._all_rows[tab_name] = [("Status", "Metadata unavailable", "Error")]
-                self._render_table(tab_name, self._all_rows[tab_name])
+        self.load_document(
+            doc.file_path,
+            case_id=case.case_id if case else "",
+            evidence_id=evidence.evidence_id if evidence else ""
+        )
+
+    def load_document(self, file_path: str, case_id: str = "", evidence_id: str = ""):
+        """Run deep forensic examination against the original immutable evidence file."""
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, "Missing File", f"Evidence file not found on disk:\n{file_path}")
             return
 
-        # Original Hash
-        self._lbl_orig_hash.setText(f"Original SHA-256:\n{doc.sha256 or '—'}")
-        self._lbl_san_hash.setText("Sanitized SHA-256:\n—")
+        try:
+            exam_data = examine_evidence_metadata(file_path, case_id=case_id, evidence_id=evidence_id)
+            self._current_exam_data = exam_data
 
-        # 1. EXIF & Basic
-        basic_rows = [
-            ("Filename", doc.file_name, "File System"),
-            ("File Type", doc.file_type, "File System"),
-            ("File Size", f"{doc.file_size:,} bytes", "File System"),
-            ("Resolution", doc.resolution or "Not Available", "Image Header"),
-            ("Color Space", doc.color_space or "Not Available", "Image Header"),
-            ("Pages", str(doc.page_count), "Document"),
-            ("Last Modified", doc.last_modified or "Not Available", "File System"),
-            ("SHA-256", doc.sha256 or "Not Available", "Integrity"),
-            ("Integrity", doc.integrity_status, "Integrity"),
-        ]
-        raw_exif_rows = []
-        if hasattr(doc, 'raw_metadata') and isinstance(doc.raw_metadata, dict):
-            for k, v in sorted(doc.raw_metadata.items())[:120]:
-                raw_exif_rows.append((str(k), str(v), "EXIF Header"))
+            # Persist to SQLite linked to Evidence ID
+            if evidence_id:
+                try:
+                    db = get_db()
+                    db.save_metadata_examination({
+                        "case_id": case_id,
+                        "evidence_id": evidence_id,
+                        "file_path": file_path,
+                        "sha256": self._current_doc.sha256 if self._current_doc else "",
+                        "detected_format": exam_data.get("signature", {}).get("detected_format", ""),
+                        "status": "EXAMINED",
+                        "flags": exam_data.get("summary", {}).get("flags", []),
+                        "summary": exam_data.get("summary", {}),
+                        "full_data": exam_data
+                    })
+                except Exception as e:
+                    logger.debug(f"Metadata SQLite save notice: {e}")
 
-        self._all_rows["EXIF"] = basic_rows + raw_exif_rows
+            # 1. Update Evidence Line
+            c_name = self._current_context.case.case_name if self._current_context and self._current_context.case else (case_id or "Unassigned")
+            c_id = case_id or "Unassigned"
+            e_id = evidence_id or "Unassigned"
+            fn = os.path.basename(file_path)
+            fmt = exam_data.get("signature", {}).get("detected_format", "UNKNOWN")
+            sha_short = (self._current_doc.sha256[:16] + "...") if self._current_doc and self._current_doc.sha256 else "—"
 
-        # 2. XMP
-        xmp_rows = []
-        if hasattr(doc, 'raw_metadata') and isinstance(doc.raw_metadata, dict):
-            for k, v in doc.raw_metadata.items():
-                if any(x in str(k).lower() for x in ["xmp", "adobe", "photoshop", "history", "stevt"]):
-                    xmp_rows.append((str(k), str(v), "XMP Data"))
-        if not xmp_rows:
-            xmp_rows = [("XMP Status", "No standalone XMP packet detected", "XMP")]
-        self._all_rows["XMP"] = xmp_rows
-
-        # 3. IPTC
-        iptc_rows = []
-        if hasattr(doc, 'raw_metadata') and isinstance(doc.raw_metadata, dict):
-            for k, v in doc.raw_metadata.items():
-                if any(x in str(k).lower() for x in ["caption", "headline", "byline", "credit", "copyright", "source"]):
-                    iptc_rows.append((str(k), str(v), "IPTC / Rights"))
-        if not iptc_rows:
-            iptc_rows = [("IPTC Status", "No IPTC legacy records found", "IPTC")]
-        self._all_rows["IPTC"] = iptc_rows
-
-        # 4. PDF Metadata
-        self._all_rows["PDF Metadata"] = [
-            ("PDF Version", doc.pdf_version or "Not Available", "PDF Header"),
-            ("Author", doc.author or "Not Available", "PDF Info"),
-            ("Creator", doc.creator or "Not Available", "PDF Info"),
-            ("Producer", doc.producer or "Not Available", "PDF Info"),
-            ("Creation Date", doc.creation_date or "Not Available", "PDF Info"),
-            ("Objects", str(doc.pdf_objects or 0), "PDF Structure"),
-            ("Linearized", "Yes" if doc.pdf_linearized else "No", "PDF Structure"),
-        ]
-
-        # 5. Software Info & Trace
-        software_rows = [
-            ("Camera Make", doc.camera_make or "Not Available", "Hardware"),
-            ("Camera Model", doc.camera_model or "Not Available", "Hardware"),
-            ("Software", doc.software or "Not Available", "Software"),
-            ("Creator", doc.creator or "Not Available", "Software"),
-            ("Producer", doc.producer or "Not Available", "Software"),
-        ]
-        self._all_rows["Software Info"] = software_rows
-
-        # Evaluate Software Trace
-        traces = []
-        combined_software_text = f"{doc.software or ''} {doc.creator or ''} {doc.producer or ''}".lower()
-        editing_keywords = [
-            ("photoshop", "Adobe Photoshop"),
-            ("gimp", "GIMP"),
-            ("canva", "Canva"),
-            ("corel", "CorelDRAW/Paint"),
-            ("paint.net", "Paint.NET"),
-            ("photopea", "Photopea"),
-            ("affinity", "Affinity Photo"),
-            ("illustrator", "Adobe Illustrator"),
-            ("lightroom", "Adobe Lightroom"),
-            ("snapseed", "Snapseed"),
-        ]
-        for kw, display_name in editing_keywords:
-            if kw in combined_software_text:
-                traces.append(display_name)
-
-        if traces:
-            detected_str = ", ".join(traces)
-            self._software_trace_lbl.setText(
-                f"Software Signature Detected: {detected_str} (Indicates post-processing or digital modification)"
+            self._lbl_evidence_line.setText(
+                f"Case: {c_name} ({c_id})  •  Evidence: {e_id}  •  File: {fn}  •  Detected: {fmt}  •  SHA-256: {sha_short}"
             )
-            self._software_icon_lbl.setText("⚠")
-            self._software_icon_lbl.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {Colors.WARNING};")
-            self._software_banner.setStyleSheet(f"""
-                QFrame {{
-                    background-color: #FEF3C7;
-                    border: 1px solid #F59E0B;
-                    border-radius: 6px;
-                }}
-            """)
-        else:
-            if doc.camera_make or doc.camera_model:
-                self._software_trace_lbl.setText(
-                    f"Hardware Capture Signatures: {doc.camera_make or ''} {doc.camera_model or ''} (No editing software signatures found)"
-                )
+
+            # 2. Update Pills
+            summ = exam_data.get("summary", {})
+            m_stat = summ.get("metadata_status", "LIMITED")
+            self._update_pill(self._pill_meta_status, "Metadata", m_stat, m_stat)
+            self._update_pill(self._pill_exif, "EXIF", summ.get("exif_present", "Not Available"), "PRESENT" if summ.get("exif_present") == "Present" else "NONE")
+            self._update_pill(self._pill_xmp, "XMP", summ.get("xmp_present", "Not Available"), "PRESENT" if summ.get("xmp_present") == "Present" else "NONE")
+            self._update_pill(self._pill_iptc, "IPTC", summ.get("iptc_present", "Not Available"), "PRESENT" if summ.get("iptc_present") == "Present" else "NONE")
+            self._update_pill(self._pill_gps, "GPS", summ.get("gps_present", "Not Available"), "PRESENT" if summ.get("gps_present") == "Present" else "NONE")
+            self._update_pill(self._pill_software, "Software", summ.get("software_present", "Not Available"), "PRESENT" if summ.get("software_present") == "Present" else "NONE")
+
+            integ_status = self._current_doc.integrity_status if self._current_doc else "INTEGRITY VERIFIED"
+            self._update_pill(self._pill_integrity, "Integrity", integ_status, "VERIFIED" if "VERIFIED" in integ_status else "CHANGED")
+
+            incons_count = summ.get("inconsistency_count", 0)
+            if incons_count == 0:
+                self._update_pill(self._pill_consistency, "Consistency", "No Discrepancies", "NO_ANOMALY")
             else:
-                self._software_trace_lbl.setText("Software Trace: Clean metadata, no known editing signatures detected.")
-            self._software_icon_lbl.setText("✓")
-            self._software_icon_lbl.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {Colors.SUCCESS};")
-            self._software_banner.setStyleSheet(f"""
-                QFrame {{
-                    background-color: #ECFDF5;
-                    border: 1px solid #10B981;
-                    border-radius: 6px;
-                }}
-            """)
+                self._update_pill(self._pill_consistency, "Consistency", f"{incons_count} Discrepanc{'y' if incons_count==1 else 'ies'}", "WARNING")
 
-        self._apply_filter(self._search_input.text())
+            # 3. Populate Tabs
+            # EXIF
+            exif_rows = exam_data.get("exif", {}).get("rows", [])
+            self._all_rows["EXIF"] = exif_rows or [("EXIF Status", "EXIF metadata not present in this document", "EXIF")]
+            self._render_table(self._tables["EXIF"], self._all_rows["EXIF"])
 
-    def _render_table(self, tab_name: str, rows):
-        table = self._tables.get(tab_name)
-        if not table:
-            return
-        table.setRowCount(len(rows))
-        for row_idx, item in enumerate(rows):
-            prop = str(item[0])
-            val = str(item[1]) if len(item) > 1 else ""
-            cat = str(item[2]) if len(item) > 2 else "General"
-            
-            p_item = QTableWidgetItem(prop)
-            v_item = QTableWidgetItem(val)
-            c_item = QTableWidgetItem(cat)
-            
-            c_item.setForeground(Qt.gray)
-            table.setItem(row_idx, 0, p_item)
-            table.setItem(row_idx, 1, v_item)
-            table.setItem(row_idx, 2, c_item)
+            # XMP
+            xmp_rows = exam_data.get("xmp", {}).get("rows", [])
+            self._all_rows["XMP"] = xmp_rows or [("XMP Status", "No embedded XMP packet detected", "XMP")]
+            self._render_table(self._tables["XMP"], self._all_rows["XMP"])
 
-    def _apply_filter(self, filter_text: str):
-        query = (filter_text or "").strip().lower()
-        for tab_name, rows in self._all_rows.items():
-            if not query:
-                filtered = rows
+            # IPTC
+            iptc_rows = exam_data.get("iptc", {}).get("rows", [])
+            self._all_rows["IPTC"] = iptc_rows or [("IPTC Status", "No legacy IPTC records detected", "IPTC")]
+            self._render_table(self._tables["IPTC"], self._all_rows["IPTC"])
+
+            # PDF
+            pdf_rows = exam_data.get("pdf", {}).get("rows", [])
+            self._all_rows["PDF"] = pdf_rows or [("PDF Status", "Not a PDF document", "PDF Engine")]
+            self._render_table(self._tables["PDF"], self._all_rows["PDF"])
+
+            # FILE
+            fs_rows = exam_data.get("filesystem_rows", [])
+            # Prepend signature row
+            sig = exam_data.get("signature", {})
+            fs_full = [
+                ("Declared Extension", f".{sig.get('declared_ext', '')}", "Filesystem Header"),
+                ("Detected Magic Bytes", f"{sig.get('detected_format')} (Magic: {sig.get('magic_hex', '')[:16]})", "File Signature"),
+                ("Container Consistency", "CONSISTENT" if sig.get("is_consistent") else "FORMAT MISMATCH", "Container Validation")
+            ] + fs_rows
+            self._all_rows["FILE"] = fs_full
+            self._render_table(self._tables["FILE"], self._all_rows["FILE"])
+
+            # JPEG / CONTAINER
+            det_fmt = sig.get("detected_format", "")
+            if "JPEG" in det_fmt:
+                cont_rows = exam_data.get("jpeg", {}).get("rows", [])
+            elif "PNG" in det_fmt:
+                cont_rows = exam_data.get("png", {}).get("rows", [])
+            elif "TIFF" in det_fmt:
+                cont_rows = exam_data.get("tiff", {}).get("rows", [])
+            elif "WEBP" in det_fmt:
+                cont_rows = exam_data.get("webp", {}).get("rows", [])
             else:
-                filtered = [
-                    r for r in rows
-                    if query in str(r[0]).lower() or query in str(r[1]).lower() or (len(r) > 2 and query in str(r[2]).lower())
-                ]
-            self._render_table(tab_name, filtered)
+                cont_rows = [("Container Analysis", f"Container format: {det_fmt}", "Container Parser")]
+            self._all_rows["JPEG / CONTAINER"] = cont_rows
+            self._render_table(self._tables["JPEG / CONTAINER"], self._all_rows["JPEG / CONTAINER"])
 
-    def _on_detect_anomalies(self):
-        from services.app_state import get_app_state
-        ctx = get_app_state().context
-        if not ctx or not ctx.document:
-            QMessageBox.warning(self, "No Document", "Please load a document first.")
-            return
-            
-        from services.metadata_service import detect_anomalies
-        anomalies = detect_anomalies(ctx.document)
-        if anomalies:
-            msg = "Forensic Anomalies Identified:\n\n"
-            for a in anomalies:
-                msg += f"• [{a['severity'].upper()}] {a['finding']}\n"
-            QMessageBox.information(self, "Metadata Anomaly Analysis", msg)
-        else:
-            QMessageBox.information(self, "Metadata Anomaly Analysis", "No suspicious metadata discrepancies or anomalies detected.")
-
-    def _on_sanitize(self):
-        from services.app_state import get_app_state
-        ctx = get_app_state().context
-        if not ctx or not ctx.document:
-            QMessageBox.warning(self, "No Document", "Please load a document first.")
-            return
-            
-        from PyQt5.QtWidgets import QFileDialog
-        out_path, _ = QFileDialog.getSaveFileName(self, "Save Derivative Sanitized Copy", "", "All Files (*.*)")
-        if out_path:
-            from services.metadata_service import sanitize_metadata
-            success = sanitize_metadata(ctx.document.file_path, out_path)
-            if success:
-                from services.hash_service import calculate_sha256
-                san_hash = calculate_sha256(out_path) or "Calculated"
-                self._lbl_san_hash.setText(f"Sanitized SHA-256:\n{san_hash}")
-                
-                QMessageBox.information(
-                    self, "Sanitization Complete",
-                    f"Metadata stripped successfully.\n\n"
-                    f"Saved derivative copy to:\n{out_path}\n\n"
-                    f"New SHA-256:\n{san_hash}\n\n"
-                    f"Original evidence remains intact and unchanged."
-                )
-                from services.db_service import get_db
-                if ctx.evidence:
-                    get_db().add_processing_history(
-                        ctx.evidence.evidence_id,
-                        "Metadata Sanitization",
-                        f"Derivative copy created at {out_path} with SHA-256: {san_hash}"
-                    )
+            # SOFTWARE
+            soft_indicators = exam_data.get("consistency", {}).get("software_indicators", [])
+            soft_rows = []
+            if soft_indicators:
+                for ind in soft_indicators:
+                    parts = ind.split(":", 1)
+                    prop = parts[0].strip()
+                    val = parts[1].strip() if len(parts) > 1 else ind
+                    soft_rows.append((prop, val, "Observed Metadata"))
             else:
-                QMessageBox.warning(self, "Sanitization Failed", "Could not strip metadata from this document format.")
+                soft_rows.append(("Software Trace", "No known editing software signatures observed in metadata.", "Software Analysis"))
+            self._all_rows["SOFTWARE"] = soft_rows
+            self._render_table(self._tables["SOFTWARE"], self._all_rows["SOFTWARE"])
 
-    def _on_export_report(self):
-        if not self._current_doc:
-            QMessageBox.warning(self, "No Data", "No metadata loaded to export.")
+            # CONSISTENCY & TIMELINE
+            incons = exam_data.get("consistency", {}).get("inconsistencies", [])
+            self._incons_table.setRowCount(len(incons) if incons else 1)
+            if incons:
+                for idx, inc in enumerate(incons):
+                    self._incons_table.setItem(idx, 0, QTableWidgetItem(str(inc.get("field"))))
+                    self._incons_table.setItem(idx, 1, QTableWidgetItem(f"Observed: {inc.get('observed_value')} vs {inc.get('comparison_value')}"))
+                    self._incons_table.setItem(idx, 2, QTableWidgetItem(str(inc.get("reason"))))
+            else:
+                self._incons_table.setItem(0, 0, QTableWidgetItem("Consistency Check"))
+                self._incons_table.setItem(0, 1, QTableWidgetItem("No major discrepancies or anomalies detected."))
+                self._incons_table.setItem(0, 2, QTableWidgetItem("All available properties are mutually consistent."))
+
+            # Timeline
+            tline = exam_data.get("timeline", [])
+            self._timeline_table.setRowCount(len(tline) if tline else 1)
+            if tline:
+                for idx, t in enumerate(tline):
+                    self._timeline_table.setItem(idx, 0, QTableWidgetItem(f"{t.get('source')}: {t.get('event')}"))
+                    self._timeline_table.setItem(idx, 1, QTableWidgetItem(str(t.get("timestamp_str"))))
+                    self._timeline_table.setItem(idx, 2, QTableWidgetItem(str(t.get("source"))))
+            else:
+                self._timeline_table.setItem(0, 0, QTableWidgetItem("Timeline"))
+                self._timeline_table.setItem(0, 1, QTableWidgetItem("No timestamps recorded in document."))
+                self._timeline_table.setItem(0, 2, QTableWidgetItem("Metadata"))
+
+            # RAW
+            raw_copy = dict(exam_data)
+            if "exif" in raw_copy and isinstance(raw_copy["exif"], dict):
+                raw_c_ex = dict(raw_copy["exif"])
+                raw_c_ex.pop("thumbnail_bytes", None)
+                raw_copy["exif"] = raw_c_ex
+            formatted_json = json.dumps(raw_copy, indent=2, ensure_ascii=False)
+            self._raw_text_view.setPlainText(formatted_json)
+
+        except Exception as e:
+            logger.error(f"Error during metadata examination of {file_path}: {e}", exc_info=True)
+            QMessageBox.critical(self, "Examination Error", f"Metadata examination failed:\n{str(e)}")
+
+    def _apply_filter(self, query: str):
+        """Filter rows in the current table by query string."""
+        query = query.strip().lower()
+        curr_tab = self._tabs.tabText(self._tabs.currentIndex())
+        if curr_tab not in self._tables:
             return
-        from PyQt5.QtWidgets import QFileDialog
-        out_path, _ = QFileDialog.getSaveFileName(self, "Export Metadata Report", "metadata_report.txt", "Text Files (*.txt);;All Files (*.*)")
+
+        table = self._tables[curr_tab]
+        all_data = self._all_rows.get(curr_tab, [])
+        if not query:
+            self._render_table(table, all_data)
+            return
+
+        filtered = [
+            row for row in all_data
+            if query in str(row[0]).lower() or query in str(row[1]).lower() or (len(row) > 2 and query in str(row[2]).lower())
+        ]
+        self._render_table(table, filtered)
+
+    def _on_export_json(self):
+        """Export metadata examination to JSON."""
+        if not self._current_exam_data:
+            QMessageBox.information(self, "No Data", "No metadata examination available to export.")
+            return
+
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Metadata JSON", "forensic_metadata_report.json",
+            "JSON Files (*.json);;All Files (*.*)"
+        )
         if not out_path:
             return
-        try:
-            with open(out_path, 'w', encoding='utf-8') as f:
-                f.write(f"ANTORDRISHTI FORENSIC METADATA REPORT\n")
-                f.write(f"Document: {self._current_doc.file_name}\n")
-                f.write(f"Original SHA-256: {self._current_doc.sha256}\n")
-                f.write("="*60 + "\n\n")
-                for tab_name, rows in self._all_rows.items():
-                    f.write(f"[{tab_name}]\n")
-                    for r in rows:
-                        prop = r[0]
-                        val = r[1] if len(r) > 1 else ""
-                        cat = r[2] if len(r) > 2 else ""
-                        f.write(f"  {prop:30} : {val:40} ({cat})\n")
-                    f.write("\n")
-            QMessageBox.information(self, "Report Exported", f"Metadata report exported to:\n{out_path}")
-        except Exception as e:
-            QMessageBox.critical(self, "Export Failed", f"Failed to export report: {str(e)}")
 
+        if export_metadata_to_json(self._current_exam_data, out_path):
+            QMessageBox.information(self, "Export Complete", f"Metadata examination exported successfully to:\n{out_path}")
+        else:
+            QMessageBox.warning(self, "Export Failed", "Failed to write metadata JSON file.")
+
+    def _on_export_txt(self):
+        """Export metadata examination to formatted TXT."""
+        if not self._current_exam_data:
+            QMessageBox.information(self, "No Data", "No metadata examination available to export.")
+            return
+
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Metadata Report", "forensic_metadata_report.txt",
+            "Text Files (*.txt);;All Files (*.*)"
+        )
+        if not out_path:
+            return
+
+        if export_metadata_to_txt(self._current_exam_data, out_path):
+            QMessageBox.information(self, "Export Complete", f"Forensic report exported successfully to:\n{out_path}")
+        else:
+            QMessageBox.warning(self, "Export Failed", "Failed to write metadata report TXT file.")
+
+    def _on_sanitize(self):
+        """
+        Create a sanitized derivative copy with metadata stripped.
+        Original evidence remains strictly immutable.
+        """
+        if not self._current_doc or not self._current_doc.file_path:
+            QMessageBox.information(self, "No Document", "No active evidence document loaded.")
+            return
+
+        src_path = self._current_doc.file_path
+        ext = os.path.splitext(src_path)[1]
+        default_out = os.path.join(
+            os.path.dirname(src_path),
+            f"{os.path.splitext(os.path.basename(src_path))[0]}_sanitized{ext}"
+        )
+
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Save Sanitized Derivative Copy", default_out,
+            f"Supported Files (*{ext});;All Files (*.*)"
+        )
+        if not out_path:
+            return
+
+        if os.path.abspath(out_path) == os.path.abspath(src_path):
+            QMessageBox.warning(
+                self, "Forensic Safety Restriction",
+                "Cannot overwrite original evidence file.\n"
+                "Please choose a different destination filename for the sanitized copy."
+            )
+            return
+
+        success = sanitize_metadata(src_path, out_path)
+        if success:
+            QMessageBox.information(
+                self, "Sanitization Complete",
+                f"Derivative sanitized file created successfully:\n{out_path}\n\n"
+                "The original evidence file remains completely unaltered and immutable."
+            )
+        else:
+            QMessageBox.warning(
+                self, "Sanitization Failed",
+                "Could not sanitize metadata for this file format."
+            )

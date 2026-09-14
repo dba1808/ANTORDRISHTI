@@ -144,12 +144,31 @@ class EvidenceManagerPage(QWidget):
         self._timer.timeout.connect(self._check_case_update)
         self._timer.start(2000)
 
+    def set_current_context(self, context):
+        """Update Evidence Manager when shared case or document changes."""
+        case_id = context.case.case_id if context and context.case else ""
+        case_name = context.case.case_name if context and context.case else ""
+        if self._current_case_id != case_id:
+            self._current_case_id = case_id
+            if case_id:
+                self._case_label.setText(f"Active Case: {case_id} — {case_name}")
+                self.btn_add.setEnabled(True)
+            else:
+                self._case_label.setText("(No active case)")
+                self.btn_add.setEnabled(False)
+            self._load_data()
+        elif case_id:
+            self._load_data()
+
     def set_case(self, case_id: str):
         """Set the active case and reload evidence."""
         if self._current_case_id != case_id:
             self._current_case_id = case_id
             if case_id:
-                self._case_label.setText(f"(Active: {case_id})")
+                db = get_db()
+                case_row = db.get_case(case_id)
+                name = (case_row.get("case_name") or case_row.get("title", "")) if case_row else ""
+                self._case_label.setText(f"Active Case: {case_id} — {name}" if name else f"Active Case: {case_id}")
                 self.btn_add.setEnabled(True)
             else:
                 self._case_label.setText("(No active case)")
@@ -252,7 +271,8 @@ class EvidenceManagerPage(QWidget):
             
         db = get_db()
         verified = 0
-        failed = 0
+        changed = 0
+        missing = 0
         
         for index in rows:
             row = index.row()
@@ -261,10 +281,10 @@ class EvidenceManagerPage(QWidget):
             
             if not os.path.exists(file_path):
                 db.update_evidence(evd_id, self._current_case_id, {"status": "Missing File"})
-                failed += 1
+                missing += 1
                 continue
                 
-            # Recompute hash
+            # Recompute hash on original evidence file
             current_sha256, _ = calculate_hashes(file_path)
             
             # Get original hash from DB
@@ -276,17 +296,23 @@ class EvidenceManagerPage(QWidget):
                     break
                     
             if current_sha256 and current_sha256 == original_sha256:
-                db.update_evidence(evd_id, self._current_case_id, {"status": "Verified"})
+                db.update_evidence(evd_id, self._current_case_id, {"status": "INTEGRITY VERIFIED"})
                 verified += 1
             else:
-                db.update_evidence(evd_id, self._current_case_id, {"status": "Integrity Failed"})
-                failed += 1
+                db.update_evidence(evd_id, self._current_case_id, {"status": "INTEGRITY CHANGED"})
+                db.add_case_event(
+                    self._current_case_id,
+                    evd_id,
+                    "INTEGRITY CHANGED",
+                    f"SHA-256 hash mismatch for evidence {evd_id}! Stored: {original_sha256}, Recomputed: {current_sha256}"
+                )
+                changed += 1
                 
         self._load_data()
-        QMessageBox.information(
-            self, "Verification Complete", 
-            f"Verification finished.\n\nVerified (Match): {verified}\nFailed (Mismatch/Missing): {failed}"
-        )
+        msg = f"Forensic verification complete.\n\n• Integrity Verified: {verified}\n• Integrity Changed (Mismatch): {changed}"
+        if missing:
+            msg += f"\n• Missing Files: {missing}"
+        QMessageBox.information(self, "Verification Complete", msg)
 
     def _on_remove_evidence(self):
         rows = self._table.selectionModel().selectedRows()

@@ -4,7 +4,7 @@ Antordrishti — Document Data Model
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 @dataclass
@@ -47,6 +47,16 @@ class DocumentModel:
     pdf_streams: int = 0
     pdf_has_trailer: bool = False
     pdf_linearized: bool = False
+    native_pdf_text: str = ""
+    content_classification: str = ""  # TEXT, IMAGE, BOTH, BLANK
+    embedded_images: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Forensic Metadata Examination
+    detected_format: str = ""
+    format_consistent: bool = True
+    format_warning: str = ""
+    metadata_record: Optional[Dict[str, Any]] = None
+    forensic_flags: List[str] = field(default_factory=list)
 
     def __post_init__(self):
         if self.loaded_at is None:

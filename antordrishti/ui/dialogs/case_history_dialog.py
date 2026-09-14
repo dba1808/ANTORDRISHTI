@@ -50,7 +50,7 @@ class CaseHistoryDialog(QDialog):
         self._table = QTableWidget()
         self._table.setColumnCount(5)
         self._table.setHorizontalHeaderLabels([
-            "Case ID", "Title", "Examiner", "Date", "Status"
+            "Case ID", "Case Name", "Examiner", "Date", "Status"
         ])
         self._table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -136,7 +136,7 @@ class CaseHistoryDialog(QDialog):
                     row, 0, QTableWidgetItem(case_data.get("case_id", ""))
                 )
                 self._table.setItem(
-                    row, 1, QTableWidgetItem(case_data.get("title", ""))
+                    row, 1, QTableWidgetItem(case_data.get("case_name") or case_data.get("title", ""))
                 )
                 self._table.setItem(
                     row, 2, QTableWidgetItem(case_data.get("examiner", ""))
