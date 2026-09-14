@@ -1,0 +1,49 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Testing/cache
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.pyright/
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python tooling cache
+.cache/
+
+# Local database/data
+*.db
+*.sqlite
+*.sqlite3

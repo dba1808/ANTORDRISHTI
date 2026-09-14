@@ -1,0 +1,23 @@
+services:
+  antordrishti:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: arnabbasak24/antordrishti:latest
+
+    container_name: antordrishti
+
+    environment:
+      QT_X11_NO_MITSHM: "1"
+      DISPLAY: ${DISPLAY}
+
+    volumes:
+      - antordrishti_data:/root/.antordrishti
+      - ./antordrishti/logs:/app/antordrishti/logs
+
+    stdin_open: true
+    tty: true
+
+volumes:
+  antordrishti_data:
